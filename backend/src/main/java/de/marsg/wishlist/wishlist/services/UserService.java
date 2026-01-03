@@ -10,7 +10,7 @@ import de.marsg.wishlist.wishlist.configs.CacheConfig;
 import de.marsg.wishlist.wishlist.data.jpa.entity.User;
 import de.marsg.wishlist.wishlist.data.jpa.repository.UserRepository;
 import de.marsg.wishlist.wishlist.logging.LogMgr;
-import de.marsg.wishlist.wishlist.request.dto.user.UserDTO;
+import de.marsg.wishlist.wishlist.request.dto.users.UserDTO;
 
 @Service
 public class UserService {

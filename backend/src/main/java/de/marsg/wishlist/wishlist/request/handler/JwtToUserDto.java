@@ -3,7 +3,7 @@ package de.marsg.wishlist.wishlist.request.handler;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
-import de.marsg.wishlist.wishlist.request.dto.user.UserDTO;
+import de.marsg.wishlist.wishlist.request.dto.users.UserDTO;
 
 @Component
 public class JwtToUserDto {

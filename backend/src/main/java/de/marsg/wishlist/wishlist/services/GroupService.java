@@ -22,7 +22,7 @@ import de.marsg.wishlist.wishlist.request.dto.groups.CreateUpdateGroupDTO;
 import de.marsg.wishlist.wishlist.request.dto.groups.ReturnGroupDTO;
 import de.marsg.wishlist.wishlist.request.dto.groups.ReturnGroupListDTO;
 import de.marsg.wishlist.wishlist.request.dto.groups.ReturnSimpleGroupDTO;
-import de.marsg.wishlist.wishlist.request.dto.user.UserDTO;
+import de.marsg.wishlist.wishlist.request.dto.users.UserDTO;
 
 @Service
 public class GroupService {

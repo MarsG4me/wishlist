@@ -1,4 +1,4 @@
-package de.marsg.wishlist.wishlist.request.dto.user;
+package de.marsg.wishlist.wishlist.request.dto.users;
 
 import java.util.UUID;
 

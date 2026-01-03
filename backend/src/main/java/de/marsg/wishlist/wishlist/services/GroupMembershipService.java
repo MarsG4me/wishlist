@@ -16,8 +16,8 @@ import de.marsg.wishlist.wishlist.data.jpa.repository.GroupMembershipRepository;
 import de.marsg.wishlist.wishlist.data.jpa.repository.GroupRepository;
 import de.marsg.wishlist.wishlist.logging.LogMgr;
 import de.marsg.wishlist.wishlist.request.dto.memberships.ReturnGroupMembersDTO;
-import de.marsg.wishlist.wishlist.request.dto.user.GroupUserReturnDTO;
-import de.marsg.wishlist.wishlist.request.dto.user.UserDTO;
+import de.marsg.wishlist.wishlist.request.dto.users.GroupUserReturnDTO;
+import de.marsg.wishlist.wishlist.request.dto.users.UserDTO;
 
 @Service
 public class GroupMembershipService {

@@ -2,7 +2,7 @@ package de.marsg.wishlist.wishlist.request.dto.memberships;
 
 import java.util.List;
 
-import de.marsg.wishlist.wishlist.request.dto.user.GroupUserReturnDTO;
+import de.marsg.wishlist.wishlist.request.dto.users.GroupUserReturnDTO;
 
 
 public record ReturnGroupMembersDTO(
