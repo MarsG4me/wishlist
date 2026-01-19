@@ -16,7 +16,7 @@ import de.marsg.wishlist.wishlist.data.jpa.repository.GroupMembershipRepository;
 import de.marsg.wishlist.wishlist.data.jpa.repository.GroupRepository;
 import de.marsg.wishlist.wishlist.logging.LogMgr;
 import de.marsg.wishlist.wishlist.request.dto.memberships.ReturnGroupMembersDTO;
-import de.marsg.wishlist.wishlist.request.dto.users.GroupUserReturnDTO;
+import de.marsg.wishlist.wishlist.request.dto.users.ReturnGroupUserDTO;
 import de.marsg.wishlist.wishlist.request.dto.users.UserDTO;
 
 @Service
@@ -64,8 +64,8 @@ public class GroupMembershipService {
 
         List<User> members = membershipRepository.findAllUsersByGroupId(groupId, offset);
 
-        List<GroupUserReturnDTO> memberDtos = members.stream()
-                .map(user -> new GroupUserReturnDTO(user.getKeycloakId(), user.getFirstName(), user.getLastName(),
+        List<ReturnGroupUserDTO> memberDtos = members.stream()
+                .map(user -> new ReturnGroupUserDTO(user.getKeycloakId(), user.getFirstName(), user.getLastName(),
                         membershipRepository.findMembershipByGroupIdAndUserId(group.get().getId(), user.getKeycloakId())
                                 .get().isAdmin()))
                 .toList();
@@ -120,7 +120,7 @@ public class GroupMembershipService {
 
         membershipRepository.save(membership.get());
 
-        return ResponseEntity.ok(new GroupUserReturnDTO(
+        return ResponseEntity.ok(new ReturnGroupUserDTO(
                 membership.get().getUser().getKeycloakId(),
                 membership.get().getUser().getFirstName(),
                 membership.get().getUser().getLastName(),

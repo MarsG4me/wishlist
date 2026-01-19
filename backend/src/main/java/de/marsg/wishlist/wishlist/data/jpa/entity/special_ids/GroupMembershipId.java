@@ -16,7 +16,7 @@ public class GroupMembershipId implements Serializable  {
     @Column(name = "user_id", columnDefinition = "uuid")
     private UUID userId;
 
-    public GroupMembershipId() {}
+    protected GroupMembershipId() {}
 
     public GroupMembershipId(UUID groupId, UUID userId) {
         this.groupId = groupId;

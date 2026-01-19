@@ -1,7 +1,5 @@
 package de.marsg.wishlist.wishlist.data.jpa.entity;
 
-import java.util.UUID;
-
 import de.marsg.wishlist.wishlist.data.jpa.entity.special_ids.GroupMembershipId;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;

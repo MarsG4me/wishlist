@@ -18,7 +18,8 @@ import jakarta.transaction.Transactional;
 public interface GroupMembershipRepository extends JpaRepository<GroupMembership, GroupMembershipId> {
 
     @Query(value = "SELECT g.* FROM groups g JOIN group_memberships gm ON g.id = gm.group_id WHERE gm.user_id = :userId LIMIT :limit OFFSET :offset", nativeQuery = true)
-    List<Group> findAllGroupsByUserId(@Param("userId") UUID userId, @Param("limit") int limit, @Param("offset") int offset);
+    List<Group> findAllGroupsByUserId(@Param("userId") UUID userId, @Param("limit") int limit,
+            @Param("offset") int offset);
 
     default List<Group> findAllGroupsByUserId(@Param("userId") UUID userId, @Param("offset") int offset) {
         return findAllGroupsByUserId(userId, 20, offset);
@@ -28,7 +29,8 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
     long countUsersGroups(@Param("userId") UUID userId);
 
     @Query(value = "SELECT u.* FROM users u JOIN group_memberships gm ON u.keycloak_id = gm.user_id WHERE gm.group_id = :groupId LIMIT :limit OFFSET :offset", nativeQuery = true)
-    List<User> findAllUsersByGroupId(@Param("groupId") UUID groupId, @Param("limit") int limit, @Param("offset") int offset);
+    List<User> findAllUsersByGroupId(@Param("groupId") UUID groupId, @Param("limit") int limit,
+            @Param("offset") int offset);
 
     default List<User> findAllUsersByGroupId(@Param("groupId") UUID groupId, @Param("offset") int offset) {
         return findAllUsersByGroupId(groupId, 50, offset);
@@ -40,9 +42,15 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
     @Query("SELECT CASE WHEN COUNT(gm) > 0 THEN true ELSE false END FROM GroupMembership gm WHERE gm.id.groupId = :groupId AND gm.id.userId = :userId")
     boolean existsByGroupIdAndUserId(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
 
-    
+    @Query("SELECT CASE WHEN COUNT(gm) > 0 THEN true ELSE false END FROM GroupMembership gm1 JOIN GroupMembership gm2 ON gm1.id.groupId = gm2.id.groupId WHERE gm1.id.userId = :userId1 AND gm2.id.userId = :userId2")
+    boolean existsGroupWithBothUsers(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
+
+    @Query("SELECT DISTINCT g FROM Group g JOIN GroupMembership gm1 ON g.id = gm1.id.groupId JOIN GroupMembership gm2 ON g.id = gm2.id.groupId WHERE gm1.id.userId = :userId1 AND gm2.id.userId = :userId2")
+    List<Group> findGroupsWithBothUsers(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
+
     @Query("SELECT gm FROM GroupMembership gm WHERE gm.id.groupId = :groupId AND gm.id.userId = :userId")
-    Optional<GroupMembership> findMembershipByGroupIdAndUserId(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
+    Optional<GroupMembership> findMembershipByGroupIdAndUserId(@Param("groupId") UUID groupId,
+            @Param("userId") UUID userId);
 
     @Modifying
     @Transactional

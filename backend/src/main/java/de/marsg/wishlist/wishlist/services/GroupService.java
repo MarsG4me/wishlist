@@ -27,7 +27,7 @@ import de.marsg.wishlist.wishlist.request.dto.users.UserDTO;
 @Service
 public class GroupService {
 
-    private static final int MAX_GROUP_CREATION_PER_USER = 5;
+    private static final int MAX_GROUPS_OWNED_PER_USER = 5;
 
     private UserService userService;
     private GroupRepository groupRepository;
@@ -233,7 +233,7 @@ public class GroupService {
      */
 
     private boolean canCreateMoreGroups(UserDTO user) {
-        return groupRepository.findAllByOwner(userService.getUser(user)).size() < MAX_GROUP_CREATION_PER_USER;
+        return groupRepository.findAllByOwner(userService.getUser(user)).size() < MAX_GROUPS_OWNED_PER_USER;
     }
 
     private ResponseEntity<Object> returnFailedUserVerification() {
