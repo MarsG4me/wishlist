@@ -6,9 +6,9 @@ import de.marsg.wishlist.wishlist.request.dto.users.GroupUserReturnDTO;
 
 
 public record ReturnGroupMembersDTO(
-    long totalGroups,
+    long total,
     int offset,
-    int returnedGroups,
+    int count,
     List<GroupUserReturnDTO> members
 ) {
 

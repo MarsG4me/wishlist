@@ -3,9 +3,9 @@ package de.marsg.wishlist.wishlist.request.dto.groups;
 import java.util.List;
 
 public record ReturnGroupListDTO(
-    long totalGroups,
+    long total,
     int offset,
-    int returnedGroups,
+    int count,
     List<ReturnSimpleGroupDTO> groups
 ) {
 
