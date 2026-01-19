@@ -30,7 +30,7 @@ public class Wishlist {
     @JoinColumn(name = "owner_id", nullable = false, updatable = false)
     private User owner;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String name;
 
     @Column(name = "created_at", nullable = false, updatable = false)

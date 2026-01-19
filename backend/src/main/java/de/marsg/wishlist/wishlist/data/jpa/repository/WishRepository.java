@@ -4,14 +4,22 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 
 import de.marsg.wishlist.wishlist.data.jpa.entity.Wish;
 import de.marsg.wishlist.wishlist.data.jpa.entity.Wishlist;
+import jakarta.transaction.Transactional;
 
 @Repository
 public interface WishRepository extends JpaRepository<Wish, UUID> {
 
     List<Wish> findAllByWishlist(Wishlist wishlist);
+    
+    long countAllByWishlist(Wishlist wishlist);
+    
+    @Modifying
+    @Transactional
+    void deleteByWishlist(Wishlist wishlist);
 
 }

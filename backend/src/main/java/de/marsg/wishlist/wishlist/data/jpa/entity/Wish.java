@@ -18,6 +18,7 @@ import jakarta.persistence.Table;
 @Table(name = "wishes", indexes = {
         @Index(name = "idx_wishes_name", columnList = "name"),
         @Index(name = "idx_wishes_wishlist", columnList = "wishlist_id"),
+        @Index(name = "idx_wishes_claimer", columnList = "claimer_id"),
         @Index(name = "idx_wishes_wishlist_name", columnList = "wishlist_id,name")
 })
 public class Wish {
@@ -31,8 +32,12 @@ public class Wish {
     @ManyToOne(optional = false)
     @JoinColumn(name = "wishlist_id", nullable = false, updatable = false)
     private Wishlist wishlist;
+    
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "claimer_id", nullable = true, updatable = true)
+    private User claimer;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String name;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -41,10 +46,15 @@ public class Wish {
     @Column(name = "expires_at", nullable = true)
     private LocalDateTime expiresAt = null;
 
+    @Column(nullable = false, length = 60)
     private String description = "";
 
     @Column(name = "is_unlimited")
     private boolean isUnlimited = false;
+
+    
+    @Column(name = "is_bought_by_claimer")
+    private boolean isBoughtByClaimer = false;
 
     /*
      * Getters
@@ -78,6 +88,18 @@ public class Wish {
         return isUnlimited;
     }
 
+    public boolean isClaimed(){
+        return claimer != null;
+    }
+
+    public User getClaimer(){
+        return claimer;
+    }
+
+    public boolean isBoughtByClaimer(){
+        return isBoughtByClaimer;
+    }
+
     /*
      * Setters
      */
@@ -100,6 +122,14 @@ public class Wish {
 
     public void setUnlimited(boolean isUnlimited) {
         this.isUnlimited = isUnlimited;
+    }
+
+    public void setClaimer(User claimer){
+        this.claimer = claimer;
+    }
+
+    public void setIsBoughtByClaimer(boolean bought){
+        this.isBoughtByClaimer = bought;
     }
 
 }
