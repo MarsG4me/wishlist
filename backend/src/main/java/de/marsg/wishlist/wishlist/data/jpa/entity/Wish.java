@@ -56,6 +56,15 @@ public class Wish {
     @Column(name = "is_bought_by_claimer")
     private boolean isBoughtByClaimer = false;
 
+    protected Wish(){
+        //JPA only
+    }
+
+    public Wish(String name, Wishlist wishlist){
+        this.name = name;
+        this.wishlist = wishlist;
+    }
+
     /*
      * Getters
      */
