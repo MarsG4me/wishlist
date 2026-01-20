@@ -42,7 +42,7 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
     @Query("SELECT CASE WHEN COUNT(gm) > 0 THEN true ELSE false END FROM GroupMembership gm WHERE gm.id.groupId = :groupId AND gm.id.userId = :userId")
     boolean existsByGroupIdAndUserId(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
 
-    @Query("SELECT CASE WHEN COUNT(gm) > 0 THEN true ELSE false END FROM GroupMembership gm1 JOIN GroupMembership gm2 ON gm1.id.groupId = gm2.id.groupId WHERE gm1.id.userId = :userId1 AND gm2.id.userId = :userId2")
+    @Query("SELECT CASE WHEN COUNT(gm1) > 0 THEN true ELSE false END FROM GroupMembership gm1 JOIN GroupMembership gm2 ON gm1.id.groupId = gm2.id.groupId WHERE gm1.id.userId = :userId1 AND gm2.id.userId = :userId2")
     boolean existsGroupWithBothUsers(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
 
     @Query("SELECT DISTINCT g FROM Group g JOIN GroupMembership gm1 ON g.id = gm1.id.groupId JOIN GroupMembership gm2 ON g.id = gm2.id.groupId WHERE gm1.id.userId = :userId1 AND gm2.id.userId = :userId2")
