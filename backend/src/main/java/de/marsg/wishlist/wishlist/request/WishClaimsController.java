@@ -13,12 +13,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import de.marsg.wishlist.wishlist.request.dto.wishes.UpdateWishClaimDTO;
 import de.marsg.wishlist.wishlist.request.handler.JwtToUserDto;
 import de.marsg.wishlist.wishlist.services.WishClaimingService;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.validation.Valid;
 
 @RestController

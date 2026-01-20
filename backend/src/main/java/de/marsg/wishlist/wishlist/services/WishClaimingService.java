@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
 
 import de.marsg.wishlist.wishlist.data.jpa.entity.Wish;
 import de.marsg.wishlist.wishlist.data.jpa.repository.WishRepository;
@@ -18,6 +19,7 @@ import de.marsg.wishlist.wishlist.request.dto.wishes.ReturnClaimedWishesDTO;
 import de.marsg.wishlist.wishlist.request.dto.wishes.UpdateWishClaimDTO;
 import jakarta.transaction.Transactional;
 
+@Service
 public class WishClaimingService {
 
     private final LogMgr log;

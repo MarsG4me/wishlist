@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import de.marsg.wishlist.wishlist.data.jpa.entity.User;
@@ -22,6 +23,7 @@ import de.marsg.wishlist.wishlist.request.dto.wishes.CreateUpdateWishDTO;
 import de.marsg.wishlist.wishlist.request.dto.wishes.ReturnPublicWishDTO;
 import jakarta.transaction.Transactional;
 
+@Service
 public class WishService {
 
     private static final long MAX_WISHES_PER_LIST = 50;
@@ -51,7 +53,7 @@ public class WishService {
             return returnFailedUserVerification();
         }
 
-        Optional<Wishlist> wishlist = wishlistRepository.findById(dto.wishlist_id());
+        Optional<Wishlist> wishlist = wishlistRepository.findById(dto.wishlistId());
         if (wishlist.isEmpty() || !wishlist.get().getOwner().getKeycloakId().equals(userDto.getId())) {
             log.logInfo("User %s tried to create a wish in a wishlist but is not allowed to.", userDto.getFirstName());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
@@ -68,7 +70,7 @@ public class WishService {
 
         Wish wish = new Wish(dto.name(), wishlist.get());
         wish.setDescription(dto.description());
-        wish.setUnlimited(dto.unlimited());
+        // wish.setUnlimited(dto.unlimited());
 
         wish = wishRepository.save(wish);
 
@@ -109,11 +111,11 @@ public class WishService {
 
         wish.get().setName(dto.name());
         wish.get().setDescription(dto.description());
-        wish.get().setUnlimited(dto.unlimited());
+        // wish.get().setUnlimited(dto.unlimited());
 
         //Do the wishlist check again if the wishlist was changed
-        if (!wish.get().getWishlist().getId().equals(dto.wishlist_id())) {
-            Optional<Wishlist> wishlist = wishlistRepository.findById(dto.wishlist_id());
+        if (!wish.get().getWishlist().getId().equals(dto.wishlistId())) {
+            Optional<Wishlist> wishlist = wishlistRepository.findById(dto.wishlistId());
             //Ensure on wishlist update that the new list is owned by the user and can accept more wishes
             if (wishlist.isEmpty() || !wishlist.get().getOwner().getKeycloakId().equals(userDto.getId())) {
                 log.logInfo("User %s tried to create a wish in a wishlist but is not allowed to.",

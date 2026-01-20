@@ -9,13 +9,13 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import de.marsg.wishlist.wishlist.request.dto.wishes.CreateUpdateWishDTO;
 import de.marsg.wishlist.wishlist.request.handler.JwtToUserDto;
 import de.marsg.wishlist.wishlist.services.WishService;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.validation.Valid;
 
 @RestController
@@ -34,7 +34,6 @@ public class WishController {
     public ResponseEntity<Object> createWish(
             @Valid @RequestBody CreateUpdateWishDTO dto,
             @AuthenticationPrincipal Jwt jwt) {
-
         return wishService.create(dto, jwtToDto.convert(jwt));
     }
 
