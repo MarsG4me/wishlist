@@ -1,11 +1,11 @@
 package de.marsg.wishlist.wishlist.request.dto.wishes;
 
-import jakarta.validation.constraints.NotBlank;
+
+import jakarta.validation.constraints.NotNull;
 
 public record UpdateWishClaimDTO(
 
-    @NotBlank(message = "Field 'bought' cannot be empty.")
+    @NotNull(message = "cannot be null.")
     boolean bought
 ) {
-
 }

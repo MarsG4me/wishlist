@@ -8,25 +8,23 @@ import jakarta.validation.constraints.Size;
 
 public record CreateUpdateWishDTO(
     
-    @NotBlank(message = "Wish 'name' cannot be empty.")
-    @Size(max = 20, message = "Wish name cannot exceed 20 characters.")
-    @Size(min = 4, message = "Wish name must be longer than 4 characters.")
+    @NotBlank(message = "cannot be empty.")
+    @NotNull(message = "is required and must be true or false.")
+    @Size(max = 20, message = "cannot exceed 20 characters.")
+    @Size(min = 4, message = "must be longer than 4 characters.")
     String name,
 
-    @Size(max = 60, message = "Wish description cannot exceed 60 characters.")
-    String description,
-    
-    @NotNull(message = "Wish 'unlimited' cannot be null.")
+    @NotNull(message = "is required and must be true or false.")
     boolean unlimited,
 
-    @NotBlank(message = "Wish 'wishlist_id' cannot be empty.")
-    @NotNull(message = "Wish 'wishlist_id' cannot be null.")
-    UUID wishlist_id
+    @NotNull(message = "cannot be null.")
+    UUID wishlistId,
+
+    @Size(max = 60, message = "cannot exceed 60 characters.")
+    String description
 
 ) {
-
     public String description(){
         return description == null ? "" : description;
     }
-
 }

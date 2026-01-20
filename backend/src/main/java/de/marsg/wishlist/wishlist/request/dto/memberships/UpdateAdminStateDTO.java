@@ -4,8 +4,7 @@ import jakarta.validation.constraints.NotNull;
 
 public record UpdateAdminStateDTO(
 
-    @NotNull(message = "'setAdmin' field is required and must be true or false.")
-    Boolean setAdmin
+    @NotNull(message = "is required and must be true or false.")
+    boolean setAdmin
 ) {
-
 }

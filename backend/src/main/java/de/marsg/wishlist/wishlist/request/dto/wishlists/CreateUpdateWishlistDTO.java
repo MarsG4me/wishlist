@@ -5,9 +5,9 @@ import jakarta.validation.constraints.Size;
 
 public record CreateUpdateWishlistDTO(
     
-    @NotBlank(message = "Wishlist 'name' cannot be empty.")
-    @Size(max = 20, message = "Wishlist name cannot exceed 20 characters.")
-    @Size(min = 4, message = "Wishlist name must be longer than 4 characters.")
+    @NotBlank(message = "cannot be empty.")
+    @Size(max = 20, message = "cannot exceed 20 characters.")
+    @Size(min = 4, message = "must be longer than 4 characters.")
     String name
 
 ) {
