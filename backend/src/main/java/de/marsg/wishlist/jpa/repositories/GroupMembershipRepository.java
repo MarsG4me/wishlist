@@ -16,6 +16,8 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
 
     List<GroupMembershipEntity> findByGroupsId(UUID groupsId);
 
+    long countByGroupsIdAndIsAdminTrue(UUID groupsId);
+
     /** True when both users are members of at least one common (non-deleted) group. */
     @Query("""
             SELECT COUNT(m1) > 0 FROM GroupMembershipEntity m1

@@ -8,6 +8,7 @@ import { SharedWishlistPage } from './pages/SharedWishlistPage'
 import { MyClaimsPage } from './pages/MyClaimsPage'
 import { JoinGroupPage } from './pages/JoinGroupPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { AdminPage } from './pages/AdminPage'
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: '/claims', element: <MyClaimsPage /> },
       { path: '/join/:code', element: <JoinGroupPage /> },
       { path: '/profile', element: <ProfilePage /> },
+      { path: '/admin', element: <AdminPage /> },
     ],
   },
 ])

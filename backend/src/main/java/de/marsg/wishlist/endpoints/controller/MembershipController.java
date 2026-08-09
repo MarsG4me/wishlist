@@ -47,7 +47,7 @@ public class MembershipController {
     }
 
     @PatchMapping("/{id}")
-    @Operation(summary = "Grant/revoke the admin flag (owner or admin; owner row immutable)")
+    @Operation(summary = "Grant/revoke the admin flag (group admin); the last admin cannot be demoted")
     public ReturnMembershipDTO setAdmin(AuthenticatedUser user, @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateAdminStateDTO body) {
         return membershipService.setAdmin(user.userId(), id, body.isAdmin());
@@ -55,7 +55,7 @@ public class MembershipController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Remove a member (admin) or leave yourself; the owner cannot leave")
+    @Operation(summary = "Remove a member (group admin) or leave yourself; the last admin cannot leave")
     public void remove(AuthenticatedUser user, @PathVariable("id") UUID id) {
         membershipService.remove(user.userId(), id);
     }

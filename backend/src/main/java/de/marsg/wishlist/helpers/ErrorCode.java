@@ -31,13 +31,14 @@ public enum ErrorCode {
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "Group not found"),
     NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "You are not a member of this group"),
     NOT_GROUP_ADMIN(HttpStatus.FORBIDDEN, "You are not an admin of this group"),
-    NOT_GROUP_OWNER(HttpStatus.FORBIDDEN, "You are not the owner of this group"),
     GROUP_LIMIT_REACHED(HttpStatus.CONFLICT, "You reached the maximum number of owned groups"),
 
     MEMBERSHIP_NOT_FOUND(HttpStatus.NOT_FOUND, "Membership not found"),
     ALREADY_MEMBER(HttpStatus.CONFLICT, "You are already a member of this group"),
-    OWNER_CANNOT_LEAVE(HttpStatus.CONFLICT, "The group owner cannot leave the group"),
-    OWNER_MEMBERSHIP_IMMUTABLE(HttpStatus.CONFLICT, "The owner's membership cannot be changed"),
+    LAST_ADMIN_CANNOT_LEAVE(HttpStatus.CONFLICT,
+            "The last admin cannot leave the group; promote another member first"),
+    LAST_ADMIN_CANNOT_BE_DEMOTED(HttpStatus.CONFLICT,
+            "The last admin cannot be demoted; promote another member first"),
 
     INVITE_NOT_FOUND(HttpStatus.NOT_FOUND, "Invite not found"),
     INVITE_EXPIRED(HttpStatus.GONE, "This invite has expired"),

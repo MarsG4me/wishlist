@@ -17,8 +17,12 @@ public class GroupEntity extends SoftDeletable {
     @UuidV7
     private UUID id;
 
-    /** Owner. */
-    @Column(name = "users_id", nullable = false, updatable = false)
+    /**
+     * Creator. Only informational — authority comes from the admin flag on memberships.
+     * Transferred to another admin when the creator leaves, so the row never cascades
+     * away with an account that is no longer part of the group.
+     */
+    @Column(name = "users_id", nullable = false)
     private UUID usersId;
 
     @Column(name = "name", nullable = false, length = 100)
@@ -42,6 +46,10 @@ public class GroupEntity extends SoftDeletable {
 
     public UUID getUsersId() {
         return usersId;
+    }
+
+    public void transferCreatorTo(UUID usersId) {
+        this.usersId = usersId;
     }
 
     public String getName() {

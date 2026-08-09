@@ -103,6 +103,11 @@ body {
   word-break: break-all;
 }
 
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
 .ad-slot {
   /* renders nothing while ads are disabled; reserved layout hook for later */
   display: none;

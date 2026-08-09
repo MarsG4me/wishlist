@@ -199,6 +199,24 @@ class FullFlowIT {
                 .andExpect(jsonPath("$.error_code").value("USER_HAS_NO_COMMON_GROUP"));
     }
 
+    @Test
+    @Order(15)
+    void adminEndpointsRequireRoleAndReturnCountsOnly() throws Exception {
+        mvc.perform(get("/v1/admin/stats").with(bob()))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/v1/admin/users").param("email", "alice").with(bob()))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/v1/admin/stats").with(as(ADMIN, "Ada", "Admin", true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user_count").isNumber())
+                .andExpect(jsonPath("$.wishlist_count").isNumber())
+                .andExpect(jsonPath("$.wish_count").isNumber());
+        mvc.perform(get("/v1/admin/users").param("email", "alice.new").with(as(ADMIN, "Ada", "Admin", true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value("alice.new@it.local"))
+                .andExpect(jsonPath("$[0].tier").value("PREMIUM"));
+    }
+
     // ---------- wishlists & wishes ----------
 
     @Test
@@ -385,30 +403,49 @@ class FullFlowIT {
 
     @Test
     @Order(50)
-    void leavingAndRemovingMembers() throws Exception {
+    void lastAdminRulesAndLeaving() throws Exception {
         // dave leaves his claim first (claim disappears with last participant)
         mvc.perform(delete("/v1/claims/" + daveClaimId + "/participants/me").with(dave()))
                 .andExpect(status().isNoContent());
-        // carol leaves the group herself
+        // carol (non-admin) leaves the group herself
         mvc.perform(delete("/v1/memberships/" + carolMembershipId).with(carol()))
                 .andExpect(status().isNoContent());
-        // owner cannot leave
         String memberships = perform(get("/v1/memberships").param("group_id", groupId).with(alice()), 200);
-        String ownerMembershipId = JsonPath.read(memberships,
+        String aliceMembershipId = JsonPath.read(memberships,
                 "$[?(@.is_owner == true)].id").toString().replaceAll("[\\[\\]\"]", "");
-        mvc.perform(delete("/v1/memberships/" + ownerMembershipId).with(alice()))
+        // demote bob -> fine, alice is still admin
+        mvc.perform(json(patch("/v1/memberships/" + bobMembershipId).with(alice()), "{\"is_admin\":false}"))
+                .andExpect(status().isOk());
+        // alice is now the LAST admin: cannot be demoted, cannot leave
+        mvc.perform(json(patch("/v1/memberships/" + aliceMembershipId).with(alice()), "{\"is_admin\":false}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error_code").value("OWNER_CANNOT_LEAVE"));
+                .andExpect(jsonPath("$.error_code").value("LAST_ADMIN_CANNOT_BE_DEMOTED"));
+        mvc.perform(delete("/v1/memberships/" + aliceMembershipId).with(alice()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error_code").value("LAST_ADMIN_CANNOT_LEAVE"));
+        // promote bob again -> alice may leave (another admin remains)
+        mvc.perform(json(patch("/v1/memberships/" + bobMembershipId).with(alice()), "{\"is_admin\":true}"))
+                .andExpect(status().isOk());
+        mvc.perform(delete("/v1/memberships/" + aliceMembershipId).with(alice()))
+                .andExpect(status().isNoContent());
+        // the creator record moved to bob, so alice deleting her account cannot take the group with it
+        String remaining = perform(get("/v1/memberships").param("group_id", groupId).with(bob()), 200);
+        List<String> creators = JsonPath.read(remaining, "$[?(@.is_owner == true)].user.displayname");
+        assertThat(creators).containsExactly("Bob Baker");
     }
 
     @Test
     @Order(51)
     void unshareAndSoftDeleteEverything() throws Exception {
+        // alice left the group but still owns the wishlist -> unshare allowed
         mvc.perform(delete("/v1/groups/" + groupId + "/shares/" + wishlistId).with(alice()))
                 .andExpect(status().isNoContent());
+        // carol is no member anymore -> no admin rights
+        mvc.perform(delete("/v1/groups/" + groupId).with(carol()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error_code").value("NOT_GROUP_ADMIN"));
+        // bob is group admin -> may delete the group
         mvc.perform(delete("/v1/groups/" + groupId).with(bob()))
-                .andExpect(status().isForbidden()); // admin but not owner
-        mvc.perform(delete("/v1/groups/" + groupId).with(alice()))
                 .andExpect(status().isNoContent());
         mvc.perform(delete("/v1/wishlists/" + wishlistId).with(alice()))
                 .andExpect(status().isNoContent());

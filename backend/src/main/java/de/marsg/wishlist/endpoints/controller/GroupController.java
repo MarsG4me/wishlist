@@ -66,7 +66,7 @@ public class GroupController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Soft-delete a group (owner only)")
+    @Operation(summary = "Soft-delete a group (any group admin)")
     public void delete(AuthenticatedUser user, @PathVariable("id") UUID id) {
         groupService.softDelete(user.userId(), id);
     }

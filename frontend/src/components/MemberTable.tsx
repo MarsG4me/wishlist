@@ -13,30 +13,34 @@ interface Props {
   onRemove: (membership: Membership) => void
 }
 
+/**
+ * Groups can have several admins; the backend blocks demoting or removing the LAST
+ * admin, so all rows stay editable here ("Owner" tag is informational: the creator).
+ */
 export function MemberTable({ members, ownUserId, canManage, onToggleAdmin, onRemove }: Props) {
   return (
     <DataTable value={members} dataKey="id" emptyMessage="No members">
       <Column field="user.displayname" header="Member" />
       <Column
         header="Role"
-        body={(m: Membership) =>
-          m.is_owner ? <Tag value="Owner" /> : m.is_admin ? <Tag value="Admin" severity="info" /> : null
-        }
+        body={(m: Membership) => (
+          <span className="claim-row">
+            {m.is_owner && <Tag value="Owner" />}
+            {m.is_admin && <Tag value="Admin" severity="info" />}
+          </span>
+        )}
       />
       {canManage && (
         <Column
           header="Admin"
-          body={(m: Membership) =>
-            m.is_owner ? null : (
-              <InputSwitch checked={m.is_admin} onChange={(e) => onToggleAdmin(m, !!e.value)} />
-            )
-          }
+          body={(m: Membership) => (
+            <InputSwitch checked={m.is_admin} onChange={(e) => onToggleAdmin(m, !!e.value)} />
+          )}
         />
       )}
       <Column
         header=""
         body={(m: Membership) => {
-          if (m.is_owner) return null
           const isSelf = m.user.id === ownUserId
           if (!canManage && !isSelf) return null
           return (

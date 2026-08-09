@@ -17,6 +17,7 @@ USERS = {
     "alice": ("alice@test.local", "test"),
     "bob": ("bob@test.local", "test"),
     "carol": ("carol@test.local", "test"),
+    "admin": ("admin@test.local", "test"),  # has the `admin` realm role
 }
 
 

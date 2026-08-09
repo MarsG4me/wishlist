@@ -2,6 +2,7 @@ import { Menubar } from 'primereact/menubar'
 import { Button } from 'primereact/button'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
+import { hasAdminRole } from '../../auth/keycloak'
 import { AdSlot } from '../AdSlot'
 
 export function AppShell() {
@@ -12,6 +13,9 @@ export function AppShell() {
     { label: 'My wishlists', icon: 'pi pi-list', command: () => navigate('/') },
     { label: 'Groups', icon: 'pi pi-users', command: () => navigate('/groups') },
     { label: 'My claims', icon: 'pi pi-gift', command: () => navigate('/claims') },
+    ...(hasAdminRole()
+      ? [{ label: 'Admin', icon: 'pi pi-shield', command: () => navigate('/admin') }]
+      : []),
   ]
 
   const end = (

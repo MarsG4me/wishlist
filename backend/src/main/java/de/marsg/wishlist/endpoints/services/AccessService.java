@@ -64,9 +64,4 @@ public class AccessService {
         }
     }
 
-    public void assertGroupOwner(UUID userId, GroupEntity group) {
-        if (!group.getUsersId().equals(userId)) {
-            throw new ApiException(ErrorCode.NOT_GROUP_OWNER);
-        }
-    }
 }

@@ -50,6 +50,20 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:6543/v1/users/me
 | `FRONTEND_ORIGIN` | `http://localhost:5173` |
 | `PURGE_ENABLED` | `false` (opt-in scheduled purge of soft-deleted rows > 30 days) |
 
+## Roles
+
+**App admin** (Keycloak realm role `admin`) — sees the *Admin* entry in the menu:
+aggregate counts (users / wishlists / wishes), account search **by email only**, and
+switching a user's tier between FREE and PREMIUM. Admins get numbers and account data;
+they have no access to anyone's wishlists, wishes, groups, or claims.
+
+**Group admin** (`is_admin` on a membership) — manages one group: name/description,
+invites (create, list, revoke), promoting/demoting members, removing members, removing
+shares, deleting the group. A group can have several admins; an admin may leave whenever
+another admin remains — only the **last** admin can neither leave nor be demoted. The
+creator is shown as *Owner* for orientation only and is handed over to another admin if
+they leave.
+
 ## Testing
 
 Three layers — every endpoint is covered, plus a real-browser flow:
@@ -58,7 +72,7 @@ Three layers — every endpoint is covered, plus a real-browser flow:
 |-------|------|------------|
 | Unit tests | UUIDv7, limits, claim rules, invite joining | `cd backend && mvn test` |
 | Full-flow integration | EVERY `/v1` endpoint in dependency order against real Postgres 18 (Flyway schema, constraints, locks); JWTs injected, no Keycloak needed | CI: `mvn verify -Pit` (Testcontainers). Locally (firewall blocks Testcontainers): `backend/scripts/integration_test_local.sh` (uses the dev-stack PG with a throwaway DB) |
-| Browser E2E (Python/Playwright) | Real Keycloak login, wishlist→group→invite→join→share→claim, owner-invisibility check | `cd tests/e2e && pip install -r requirements.txt && playwright install chromium && pytest` (dev stack + backend + frontend must be running) |
+| Browser E2E (Python/Playwright) | Real Keycloak login, wishlist→group→invite→join→share→claim, owner-invisibility check, admin console + non-admin lockout | `cd tests/e2e && pip install -r requirements.txt && playwright install chromium && pytest` (dev stack + backend + frontend must be running) |
 | Manual per-endpoint | Swagger UI with bearer auth | `http://localhost:6543/docs/api-ui.html`; scripted variant: `backend/scripts/smoke.sh` |
 
 CI (`.github/workflows/ci.yml`) runs all three layers on every push/PR.

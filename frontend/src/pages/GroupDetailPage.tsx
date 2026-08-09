@@ -51,7 +51,6 @@ export function GroupDetailPage() {
 
   const ownMembership = members.find((m) => m.user.id === user?.id)
   const canManage = !!ownMembership && (ownMembership.is_admin || ownMembership.is_owner)
-  const isOwner = group?.user_id === user?.id
 
   const reload = () => {
     if (!id) return
@@ -285,7 +284,7 @@ export function GroupDetailPage() {
             </div>
             <div className="claim-row">
               <Button label="Save" icon="pi pi-check" disabled={!editName.trim()} onClick={saveSettings} />
-              {isOwner && (
+              {canManage && (
                 <Button label="Delete group" icon="pi pi-trash" severity="danger" outlined onClick={removeGroup} />
               )}
             </div>

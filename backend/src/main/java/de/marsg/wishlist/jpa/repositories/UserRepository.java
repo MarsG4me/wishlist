@@ -1,6 +1,7 @@
 package de.marsg.wishlist.jpa.repositories;
 
 import de.marsg.wishlist.jpa.entities.UserEntity;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,9 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     Optional<UserEntity> findByKeycloakId(UUID keycloakId);
+
+    /** Admin search: email only, partial match. */
+    List<UserEntity> findTop20ByEmailContainingIgnoreCaseOrderByEmailAsc(String email);
 
     /**
      * Bypasses the soft-delete restriction: used by JIT provisioning to restore a

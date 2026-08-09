@@ -83,34 +83,61 @@ public class MembershipService {
                 .toList();
     }
 
-    /** Owner's membership is immutable — the owner is always admin. */
+    /** Multiple admins allowed; the LAST admin can neither be demoted (nor leave). */
     @Transactional
     public ReturnMembershipDTO setAdmin(UUID userId, UUID membershipId, boolean isAdmin) {
         GroupMembershipEntity membership = requireMembership(membershipId);
         GroupEntity group = groupService.requireGroup(membership.getGroupsId());
         accessService.assertGroupAdmin(userId, group);
-        if (group.getUsersId().equals(membership.getUsersId())) {
-            throw new ApiException(ErrorCode.OWNER_MEMBERSHIP_IMMUTABLE);
+        if (!isAdmin && membership.isAdmin() && isLastAdmin(group.getId())) {
+            throw new ApiException(ErrorCode.LAST_ADMIN_CANNOT_BE_DEMOTED);
         }
         membership.setAdmin(isAdmin);
         UserEntity member = userRepository.findById(membership.getUsersId())
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
-        return ReturnMembershipDTO.from(membership, ReturnSimpleUserDTO.from(member), false);
+        return ReturnMembershipDTO.from(membership, ReturnSimpleUserDTO.from(member),
+                group.getUsersId().equals(membership.getUsersId()));
     }
 
-    /** Removal by a group admin, or the member themself leaving. The owner can never leave. */
+    /**
+     * Removal by a group admin, or the member themself leaving. An admin can leave
+     * as long as at least one other admin remains — only the last admin cannot.
+     */
     @Transactional
     public void remove(UUID userId, UUID membershipId) {
         GroupMembershipEntity membership = requireMembership(membershipId);
         GroupEntity group = groupService.requireGroup(membership.getGroupsId());
-        if (group.getUsersId().equals(membership.getUsersId())) {
-            throw new ApiException(ErrorCode.OWNER_CANNOT_LEAVE);
-        }
         if (!membership.getUsersId().equals(userId)) {
             accessService.assertGroupAdmin(userId, group);
         }
+        if (membership.isAdmin() && isLastAdmin(group.getId())) {
+            throw new ApiException(ErrorCode.LAST_ADMIN_CANNOT_LEAVE);
+        }
         membershipRepository.delete(membership);
+        if (group.getUsersId().equals(membership.getUsersId())) {
+            transferCreator(group, membership.getUsersId());
+        }
         log.info("User {} removed membership {} from group {}", userId, membershipId, group.getId());
+    }
+
+    /**
+     * The creator column is a NOT NULL FK that cascades on account purge; hand it to a
+     * remaining admin when the creator leaves so the group survives their account deletion.
+     */
+    private void transferCreator(GroupEntity group, UUID leavingUserId) {
+        membershipRepository.findByGroupsId(group.getId()).stream()
+                .filter(remaining -> !remaining.getUsersId().equals(leavingUserId))
+                .filter(GroupMembershipEntity::isAdmin)
+                .findFirst()
+                .ifPresent(newCreator -> {
+                    group.transferCreatorTo(newCreator.getUsersId());
+                    log.info("Transferred creator of group {} to user {}",
+                            group.getId(), newCreator.getUsersId());
+                });
+    }
+
+    private boolean isLastAdmin(UUID groupId) {
+        return membershipRepository.countByGroupsIdAndIsAdminTrue(groupId) <= 1;
     }
 
     private ReturnMembershipDTO toDto(GroupMembershipEntity membership, GroupEntity group) {

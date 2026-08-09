@@ -87,7 +87,7 @@ public class GroupService {
     @Transactional
     public void softDelete(UUID userId, UUID groupId) {
         GroupEntity group = requireGroup(groupId);
-        accessService.assertGroupOwner(userId, group);
+        accessService.assertGroupAdmin(userId, group);
         group.markDeleted();
         log.info("User {} soft-deleted group {}", userId, groupId);
     }
