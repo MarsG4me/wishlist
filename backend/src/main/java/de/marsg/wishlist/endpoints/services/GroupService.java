@@ -5,6 +5,7 @@ import de.marsg.wishlist.endpoints.dto.groups.CreateUpdateGroupDTO;
 import de.marsg.wishlist.endpoints.dto.groups.ReturnGroupDTO;
 import de.marsg.wishlist.endpoints.dto.groups.ReturnSharedWishlistDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
+import de.marsg.wishlist.endpoints.dto.wishlists.ReturnWishlistDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.helpers.PageParams;
@@ -61,7 +62,11 @@ public class GroupService {
     @Transactional(readOnly = true)
     public ReturnListDTO<ReturnGroupDTO> listOwn(UUID userId, Integer limit, Integer offset) {
         Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
-        return ReturnListDTO.of(groupRepository.findGroupsOfUser(userId, pageable), ReturnGroupDTO::from);
+        // one query returns the groups together with the requester's own admin flag
+        Page<Object[]> page = groupRepository.findGroupsOfUserWithRole(userId, pageable);
+        return ReturnListDTO.of(page, page.getContent().stream()
+                .map(row -> ReturnGroupDTO.from((GroupEntity) row[0], (Boolean) row[1]))
+                .toList());
     }
 
     @Transactional
@@ -70,14 +75,14 @@ public class GroupService {
         GroupEntity group = groupRepository.save(new GroupEntity(userId, dto.name(), dto.description()));
         membershipRepository.save(new GroupMembershipEntity(group.getId(), userId, null, true));
         log.info("User {} created group {}", userId, group.getId());
-        return ReturnGroupDTO.from(group);
+        return ReturnGroupDTO.from(group, true);
     }
 
     @Transactional(readOnly = true)
     public ReturnGroupDTO get(UUID userId, UUID groupId) {
         GroupEntity group = requireGroup(groupId);
         accessService.assertGroupMember(userId, group);
-        return ReturnGroupDTO.from(group);
+        return ReturnGroupDTO.from(group, accessService.isGroupAdmin(userId, groupId));
     }
 
     @Transactional
@@ -86,7 +91,7 @@ public class GroupService {
         accessService.assertGroupAdmin(userId, group);
         group.setName(dto.name());
         group.setDescription(dto.description());
-        return ReturnGroupDTO.from(group);
+        return ReturnGroupDTO.from(group, true);
     }
 
     @Transactional
@@ -120,6 +125,17 @@ public class GroupService {
                 .map(wishlist -> new ReturnSharedWishlistDTO(wishlist.getId(), wishlist.getName(),
                         owners.get(wishlist.getUsersId())))
                 .toList());
+    }
+
+    /** Own wishlists that can still be shared here; the "not yet shared" filter runs in SQL. */
+    @Transactional(readOnly = true)
+    public ReturnListDTO<ReturnWishlistDTO> listShareableWishlists(UUID userId, UUID groupId,
+            Integer limit, Integer offset) {
+        GroupEntity group = requireGroup(groupId);
+        accessService.assertGroupMember(userId, group);
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
+        return ReturnListDTO.of(wishlistRepository.findShareableIntoGroup(userId, groupId, pageable),
+                ReturnWishlistDTO::from);
     }
 
     /** Sharing requires owning the wishlist AND being a member of the target group. */

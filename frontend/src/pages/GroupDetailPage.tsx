@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { TabView, TabPanel } from 'primereact/tabview'
 import { Button } from 'primereact/button'
@@ -17,6 +17,7 @@ import {
   deleteGroup,
   getGroup,
   listInvites,
+  listShareableWishlists,
   listShares,
   revokeInvite,
   shareWishlist,
@@ -24,15 +25,13 @@ import {
   updateGroup,
 } from '../api/groups'
 import { listMembers, removeMember, setMemberAdmin } from '../api/memberships'
-import { listWishlists } from '../api/wishlists'
-import type { Group, Invite, Membership, SharedWishlist, Wishlist } from '../api/types'
+import type { Group, Invite, Membership, PageQuery, SharedWishlist, Wishlist } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import { useApiToast } from '../hooks/useApiToast'
+import { usePagedList } from '../hooks/usePagedList'
 import { MemberTable } from '../components/MemberTable'
+import { ListControls } from '../components/ListControls'
 import { InviteDialog } from '../components/InviteDialog'
-
-/** Group sub-lists stay small (members, shares, invites) — one maximum-size page covers them. */
-const FULL_PAGE = { limit: 100, offset: 0 }
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -41,21 +40,25 @@ export function GroupDetailPage() {
   const { showError, showSuccess } = useApiToast()
 
   const [group, setGroup] = useState<Group | null>(null)
-  const [shares, setShares] = useState<SharedWishlist[]>([])
-  const [members, setMembers] = useState<Membership[]>([])
-  const [invites, setInvites] = useState<Invite[]>([])
-  const [ownLists, setOwnLists] = useState<Wishlist[]>([])
   const [shareTarget, setShareTarget] = useState<Wishlist | null>(null)
+  const [shareable, setShareable] = useState<Wishlist[]>([])
   const [freshInvite, setFreshInvite] = useState<Invite | null>(null)
   const [inviteLimited, setInviteLimited] = useState(false)
   const [inviteMaxUses, setInviteMaxUses] = useState(5)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
 
-  const ownMembership = members.find((m) => m.user.id === user?.id)
-  const canManage = !!ownMembership && (ownMembership.is_admin || ownMembership.is_owner)
+  // permission comes from the group endpoint (boolean query), not from the member list
+  const canManage = group?.is_admin ?? false
 
-  const reload = () => {
+  const sharesFetcher = useCallback((page: PageQuery) => listShares(id!, page), [id])
+  const membersFetcher = useCallback((page: PageQuery) => listMembers(id!, page), [id])
+  const invitesFetcher = useCallback((page: PageQuery) => listInvites(id!, page), [id])
+  const shares = usePagedList<SharedWishlist>(sharesFetcher, showError)
+  const members = usePagedList<Membership>(membersFetcher, showError)
+  const invites = usePagedList<Invite>(invitesFetcher, showError, 20)
+
+  const loadGroup = useCallback(() => {
     if (!id) return
     getGroup(id)
       .then((g) => {
@@ -64,15 +67,20 @@ export function GroupDetailPage() {
         setEditDescription(g.description ?? '')
       })
       .catch(showError)
-    listShares(id, FULL_PAGE).then((page) => setShares(page.items)).catch(showError)
-    listMembers(id, FULL_PAGE).then((page) => setMembers(page.items)).catch(showError)
-    listWishlists(FULL_PAGE).then((page) => setOwnLists(page.items)).catch(showError)
-  }
-  useEffect(reload, [id])
+  }, [id])
+
+  /** The share dropdown is server-filtered, so it stays correct however shares are paged. */
+  const loadShareable = useCallback(() => {
+    if (!id) return
+    listShareableWishlists(id, { limit: 100 })
+      .then((page) => setShareable(page.items))
+      .catch(showError)
+  }, [id])
 
   useEffect(() => {
-    if (id && canManage) listInvites(id, FULL_PAGE).then((page) => setInvites(page.items)).catch(showError)
-  }, [id, canManage])
+    loadGroup()
+    loadShareable()
+  }, [loadGroup, loadShareable])
 
   if (!id || !group) return <p className="muted">…</p>
 
@@ -82,7 +90,8 @@ export function GroupDetailPage() {
       await shareWishlist(id, shareTarget.id)
       setShareTarget(null)
       showSuccess('Shared')
-      reload()
+      shares.reload()
+      loadShareable()
     } catch (e) {
       showError(e)
     }
@@ -91,7 +100,7 @@ export function GroupDetailPage() {
   const newInvite = async () => {
     try {
       const invite = await createInvite(id, inviteLimited ? inviteMaxUses : null)
-      setInvites([invite, ...invites])
+      invites.reload()
       setFreshInvite(invite)
     } catch (e) {
       showError(e)
@@ -102,7 +111,7 @@ export function GroupDetailPage() {
     try {
       await updateGroup(id, editName, editDescription || null)
       showSuccess('Saved')
-      reload()
+      loadGroup()
     } catch (e) {
       showError(e)
     }
@@ -146,15 +155,16 @@ export function GroupDetailPage() {
           <div className="claim-row" style={{ marginBottom: '1rem' }}>
             <Dropdown
               value={shareTarget}
-              options={ownLists.filter((l) => !shares.some((s) => s.wishlist_id === l.id))}
+              options={shareable}
               optionLabel="name"
               placeholder="Share one of my wishlists…"
+              emptyMessage="All your wishlists are already shared here"
               onChange={(e) => setShareTarget(e.value)}
             />
             <Button label="Share" icon="pi pi-share-alt" disabled={!shareTarget} onClick={share} />
           </div>
           <div className="card-grid">
-            {shares.map((share) => (
+            {shares.items.map((share) => (
               <Card key={share.wishlist_id} title={share.name} subTitle={`by ${share.owner.displayname}`}>
                 <div className="claim-row">
                   {share.owner.id === user?.id ? (
@@ -179,7 +189,8 @@ export function GroupDetailPage() {
                       onClick={async () => {
                         try {
                           await unshareWishlist(id, share.wishlist_id)
-                          reload()
+                          shares.reload()
+                          loadShareable()
                         } catch (e) {
                           showError(e)
                         }
@@ -189,19 +200,31 @@ export function GroupDetailPage() {
                 </div>
               </Card>
             ))}
-            {shares.length === 0 && <p className="muted">Nothing shared yet.</p>}
+            {shares.total === 0 && !shares.loading && <p className="muted">Nothing shared yet.</p>}
           </div>
+          <ListControls
+            total={shares.total}
+            limit={shares.limit}
+            offset={shares.offset}
+            loading={shares.loading}
+            isMobile={shares.isMobile}
+            hasMore={shares.hasMore}
+            onLimit={shares.setLimit}
+            onOffset={shares.setOffset}
+            onLoadMore={shares.loadMore}
+          />
         </TabPanel>
 
         <TabPanel header="Members">
           <MemberTable
-            members={members}
+            members={members.items}
             ownUserId={user?.id ?? ''}
             canManage={canManage}
             onToggleAdmin={async (membership, isAdmin) => {
               try {
                 await setMemberAdmin(membership.id, isAdmin)
-                reload()
+                members.reload()
+                loadGroup()
               } catch (e) {
                 showError(e)
               }
@@ -210,11 +233,22 @@ export function GroupDetailPage() {
               try {
                 await removeMember(membership.id)
                 if (membership.user.id === user?.id) navigate('/groups')
-                else reload()
+                else members.reload()
               } catch (e) {
                 showError(e)
               }
             }}
+          />
+          <ListControls
+            total={members.total}
+            limit={members.limit}
+            offset={members.offset}
+            loading={members.loading}
+            isMobile={members.isMobile}
+            hasMore={members.hasMore}
+            onLimit={members.setLimit}
+            onOffset={members.setOffset}
+            onLoadMore={members.loadMore}
           />
         </TabPanel>
 
@@ -235,7 +269,7 @@ export function GroupDetailPage() {
               )}
               <Button label="New invite" icon="pi pi-plus" onClick={newInvite} />
             </div>
-            <DataTable value={invites} dataKey="id" emptyMessage="No invites yet">
+            <DataTable value={invites.items} dataKey="id" emptyMessage="No invites yet">
               <Column field="code" header="Code" />
               <Column header="Status" body={inviteState} />
               <Column
@@ -255,7 +289,7 @@ export function GroupDetailPage() {
                         onClick={async () => {
                           try {
                             await revokeInvite(id, invite.id)
-                            listInvites(id, FULL_PAGE).then((page) => setInvites(page.items)).catch(showError)
+                            invites.reload()
                           } catch (e) {
                             showError(e)
                           }
@@ -266,6 +300,17 @@ export function GroupDetailPage() {
                 }
               />
             </DataTable>
+            <ListControls
+              total={invites.total}
+              limit={invites.limit}
+              offset={invites.offset}
+              loading={invites.loading}
+              isMobile={invites.isMobile}
+              hasMore={invites.hasMore}
+              onLimit={invites.setLimit}
+              onOffset={invites.setOffset}
+              onLoadMore={invites.loadMore}
+            />
           </TabPanel>
         )}
 
@@ -287,9 +332,7 @@ export function GroupDetailPage() {
             </div>
             <div className="claim-row">
               <Button label="Save" icon="pi pi-check" disabled={!editName.trim()} onClick={saveSettings} />
-              {canManage && (
-                <Button label="Delete group" icon="pi pi-trash" severity="danger" outlined onClick={removeGroup} />
-              )}
+              <Button label="Delete group" icon="pi pi-trash" severity="danger" outlined onClick={removeGroup} />
             </div>
           </TabPanel>
         )}

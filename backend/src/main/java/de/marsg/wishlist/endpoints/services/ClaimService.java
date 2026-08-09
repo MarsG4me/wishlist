@@ -68,7 +68,8 @@ public class ClaimService {
         ClaimEntity claim = claimRepository.save(new ClaimEntity(wishId, userId));
         participantRepository.save(new ClaimParticipantEntity(claim.getId(), userId, wishId));
         log.info("User {} claimed wish {} (claim {})", userId, wishId, claim.getId());
-        return new ReturnWishClaimDTO(claim.getId(), participantNames(claim.getId()));
+        // the requester just created it, so they are a participant by definition
+        return new ReturnWishClaimDTO(claim.getId(), participantNames(claim.getId()), true);
     }
 
     /** Joining an existing claim (money pooling) does not consume a wish unit. */
@@ -79,7 +80,7 @@ public class ClaimService {
         lockedClaimableWish(userId, claim.getWishesId());
         participantRepository.save(new ClaimParticipantEntity(claimId, userId, claim.getWishesId()));
         log.info("User {} joined claim {}", userId, claimId);
-        return new ReturnWishClaimDTO(claimId, participantNames(claimId));
+        return new ReturnWishClaimDTO(claimId, participantNames(claimId), true);
     }
 
     /** Leaving as the last participant hard-deletes the claim, freeing the wish unit. */

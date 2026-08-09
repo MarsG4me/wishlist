@@ -12,10 +12,11 @@ public interface GroupRepository extends JpaRepository<GroupEntity, UUID> {
 
     long countByUsersId(UUID usersId);
 
+    /** Groups plus the requester's own admin flag, so the UI never derives rights from a list. */
     @Query("""
-            SELECT g FROM GroupEntity g
+            SELECT g, m.isAdmin FROM GroupEntity g
             JOIN GroupMembershipEntity m ON m.groupsId = g.id
             WHERE m.usersId = :userId
             """)
-    Page<GroupEntity> findGroupsOfUser(@Param("userId") UUID userId, Pageable pageable);
+    Page<Object[]> findGroupsOfUserWithRole(@Param("userId") UUID userId, Pageable pageable);
 }

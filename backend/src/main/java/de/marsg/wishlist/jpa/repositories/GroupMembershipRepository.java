@@ -16,6 +16,9 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
 
     boolean existsByGroupsIdAndUsersId(UUID groupsId, UUID usersId);
 
+    /** Permission check as a single boolean query — never by scanning a member list. */
+    boolean existsByGroupsIdAndUsersIdAndIsAdminTrue(UUID groupsId, UUID usersId);
+
     List<GroupMembershipEntity> findByGroupsId(UUID groupsId);
 
     Page<GroupMembershipEntity> findByGroupsId(UUID groupsId, Pageable pageable);

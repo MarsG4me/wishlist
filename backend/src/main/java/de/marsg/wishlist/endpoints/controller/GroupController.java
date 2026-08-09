@@ -8,6 +8,7 @@ import de.marsg.wishlist.endpoints.dto.groups.ReturnSharedWishlistDTO;
 import de.marsg.wishlist.endpoints.dto.groups.ShareWishlistDTO;
 import de.marsg.wishlist.endpoints.dto.invites.CreateInviteDTO;
 import de.marsg.wishlist.endpoints.dto.invites.ReturnInviteDTO;
+import de.marsg.wishlist.endpoints.dto.wishlists.ReturnWishlistDTO;
 import de.marsg.wishlist.endpoints.services.GroupService;
 import de.marsg.wishlist.endpoints.services.InviteService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -81,6 +82,15 @@ public class GroupController {
             @RequestParam(value = "limit", required = false) Integer limit,
             @RequestParam(value = "offset", required = false) Integer offset) {
         return groupService.listShares(user.userId(), id, limit, offset);
+    }
+
+    @GetMapping("/{id}/shareable-wishlists")
+    @Operation(summary = "Own wishlists not yet shared into this group (member)")
+    public ReturnListDTO<ReturnWishlistDTO> listShareable(AuthenticatedUser user,
+            @PathVariable("id") UUID id,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "offset", required = false) Integer offset) {
+        return groupService.listShareableWishlists(user.userId(), id, limit, offset);
     }
 
     @PostMapping("/{id}/shares")

@@ -2,21 +2,15 @@ import { Button } from 'primereact/button'
 import { Chip } from 'primereact/chip'
 import type { SharedWish } from '../api/types'
 import { claimWish, joinClaim, leaveClaim } from '../api/claims'
-import { useAuth } from '../auth/AuthProvider'
 import { useApiToast } from '../hooks/useApiToast'
 
 /**
  * Claim controls for one shared wish: claim a free unit, join an existing claim to
- * pool money, or leave an own participation. One participation per user per wish.
+ * pool money, or leave an own participation. Which of those are possible is decided
+ * by the backend (can_claim / is_participant), matching what the endpoints enforce.
  */
 export function ClaimControls({ wish, onChanged }: { wish: SharedWish; onChanged: () => void }) {
-  const { user } = useAuth()
   const { showError, showSuccess } = useApiToast()
-
-  const myClaim = wish.claims.find((claim) =>
-    claim.participants.some((participant) => participant.id === user?.id),
-  )
-  const canClaimNew = !myClaim && (wish.remaining === null || wish.remaining > 0)
 
   const run = async (action: () => Promise<unknown>, message: string) => {
     try {
@@ -35,7 +29,7 @@ export function ClaimControls({ wish, onChanged }: { wish: SharedWish; onChanged
           {claim.participants.map((participant) => (
             <Chip key={participant.id} label={participant.displayname} icon="pi pi-gift" />
           ))}
-          {myClaim?.claim_id === claim.claim_id ? (
+          {claim.is_participant ? (
             <Button
               label="Leave"
               icon="pi pi-times"
@@ -45,7 +39,7 @@ export function ClaimControls({ wish, onChanged }: { wish: SharedWish; onChanged
               onClick={() => run(() => leaveClaim(claim.claim_id), 'Left claim')}
             />
           ) : (
-            !myClaim && (
+            wish.can_claim && (
               <Button
                 label="Chip in"
                 icon="pi pi-users"
@@ -57,7 +51,7 @@ export function ClaimControls({ wish, onChanged }: { wish: SharedWish; onChanged
           )}
         </div>
       ))}
-      {canClaimNew && (
+      {wish.can_claim && (
         <div className="claim-row">
           <Button
             label="Claim"

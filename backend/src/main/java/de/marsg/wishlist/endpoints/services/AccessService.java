@@ -51,15 +51,13 @@ public class AccessService {
         }
     }
 
-    /** Group owner or membership with admin flag. */
+    /** Boolean permission query — the caller's membership row, never a member list scan. */
+    public boolean isGroupAdmin(UUID userId, UUID groupId) {
+        return membershipRepository.existsByGroupsIdAndUsersIdAndIsAdminTrue(groupId, userId);
+    }
+
     public void assertGroupAdmin(UUID userId, GroupEntity group) {
-        if (group.getUsersId().equals(userId)) {
-            return;
-        }
-        boolean isAdmin = membershipRepository.findByGroupsIdAndUsersId(group.getId(), userId)
-                .map(GroupMembershipEntity::isAdmin)
-                .orElse(false);
-        if (!isAdmin) {
+        if (!isGroupAdmin(userId, group.getId())) {
             throw new ApiException(ErrorCode.NOT_GROUP_ADMIN);
         }
     }

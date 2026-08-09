@@ -20,10 +20,13 @@ import de.marsg.wishlist.jpa.entities.WishlistEntity;
 import de.marsg.wishlist.jpa.repositories.ClaimParticipantRepository;
 import de.marsg.wishlist.jpa.repositories.ClaimRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +70,7 @@ public class WishService {
         }
         accessService.assertCanViewWishlist(userId, wishlist);
         Map<UUID, List<ReturnWishClaimDTO>> claimsByWish =
-                claimsByWish(wishes.getContent().stream().map(WishEntity::getId).toList());
+                claimsByWish(wishes.getContent().stream().map(WishEntity::getId).toList(), userId);
         return ReturnListDTO.of(wishes, wishes.getContent().stream()
                 .map(w -> ReturnSharedWishDTO.from(w, claimsByWish.getOrDefault(w.getId(), List.of())))
                 .toList());
@@ -82,7 +85,7 @@ public class WishService {
         }
         accessService.assertCanViewWishlist(userId, wishlist);
         return ReturnSharedWishDTO.from(wish,
-                claimsByWish(List.of(wishId)).getOrDefault(wishId, List.of()));
+                claimsByWish(List.of(wishId), userId).getOrDefault(wishId, List.of()));
     }
 
     @Transactional
@@ -128,22 +131,31 @@ public class WishService {
                 .orElseThrow(() -> new ApiException(ErrorCode.WISH_NOT_FOUND));
     }
 
-    /** Claims incl. participant displaynames, grouped per wish. */
-    Map<UUID, List<ReturnWishClaimDTO>> claimsByWish(Collection<UUID> wishIds) {
+    /**
+     * Claims incl. participant displaynames, grouped per wish. The requester's own
+     * participation is flagged here so clients never scan the participant list.
+     */
+    Map<UUID, List<ReturnWishClaimDTO>> claimsByWish(Collection<UUID> wishIds, UUID requesterId) {
         if (wishIds.isEmpty()) {
             return Map.of();
         }
         Map<UUID, List<ReturnSimpleUserDTO>> participantsByClaim = new LinkedHashMap<>();
+        Set<UUID> claimsOfRequester = new HashSet<>();
         for (Object[] row : participantRepository.findParticipantRowsForWishes(wishIds)) {
             UUID claimId = (UUID) row[0];
-            participantsByClaim.computeIfAbsent(claimId, k -> new java.util.ArrayList<>())
-                    .add(new ReturnSimpleUserDTO((UUID) row[2], (String) row[3]));
+            UUID participantId = (UUID) row[2];
+            participantsByClaim.computeIfAbsent(claimId, k -> new ArrayList<>())
+                    .add(new ReturnSimpleUserDTO(participantId, (String) row[3]));
+            if (participantId.equals(requesterId)) {
+                claimsOfRequester.add(claimId);
+            }
         }
         Map<UUID, List<ReturnWishClaimDTO>> result = new LinkedHashMap<>();
         for (ClaimEntity claim : claimRepository.findByWishesIdIn(wishIds)) {
-            result.computeIfAbsent(claim.getWishesId(), k -> new java.util.ArrayList<>())
+            result.computeIfAbsent(claim.getWishesId(), k -> new ArrayList<>())
                     .add(new ReturnWishClaimDTO(claim.getId(),
-                            participantsByClaim.getOrDefault(claim.getId(), List.of())));
+                            participantsByClaim.getOrDefault(claim.getId(), List.of()),
+                            claimsOfRequester.contains(claim.getId())));
         }
         return result;
     }
@@ -152,7 +164,7 @@ public class WishService {
         if (links == null) {
             return List.of();
         }
-        List<WishLinkEntity> entities = new java.util.ArrayList<>(links.size());
+        List<WishLinkEntity> entities = new ArrayList<>(links.size());
         for (int i = 0; i < links.size(); i++) {
             entities.add(new WishLinkEntity(links.get(i).url(), links.get(i).label(), (short) i));
         }

@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Group, Invite, ListResponse, PageQuery, SharedWishlist } from './types'
+import type { Group, Invite, ListResponse, PageQuery, SharedWishlist, Wishlist } from './types'
 
 export const listGroups = async (page: PageQuery = {}): Promise<ListResponse<Group>> =>
   (await api.get('/v1/groups', { params: page })).data
@@ -21,6 +21,13 @@ export const listShares = async (
   page: PageQuery = {},
 ): Promise<ListResponse<SharedWishlist>> =>
   (await api.get(`/v1/groups/${groupId}/shares`, { params: page })).data
+
+/** Own wishlists not yet shared here — the backend filters, so paging stays correct. */
+export const listShareableWishlists = async (
+  groupId: string,
+  page: PageQuery = {},
+): Promise<ListResponse<Wishlist>> =>
+  (await api.get(`/v1/groups/${groupId}/shareable-wishlists`, { params: page })).data
 
 export const shareWishlist = async (groupId: string, wishlistId: string): Promise<void> => {
   await api.post(`/v1/groups/${groupId}/shares`, { wishlist_id: wishlistId })

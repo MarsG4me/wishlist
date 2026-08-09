@@ -52,12 +52,16 @@ export interface OwnWish {
 export interface WishClaim {
   claim_id: string
   participants: SimpleUser[]
+  /** Whether the requester is part of this claim (backend-decided). */
+  is_participant: boolean
 }
 
 /** Group-member view: includes claim state. */
 export interface SharedWish extends OwnWish {
   remaining: number | null
   claims: WishClaim[]
+  /** Whether the requester may open a new claim (backend-decided). */
+  can_claim: boolean
 }
 
 export interface UpdatedWish {
@@ -70,6 +74,8 @@ export interface Group {
   user_id: string
   name: string
   description: string | null
+  /** The requester's own permission, decided by the backend — never derived from lists. */
+  is_admin: boolean
 }
 
 export interface SharedWishlist {

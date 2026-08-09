@@ -288,7 +288,9 @@ class FullFlowIT {
         groupId = JsonPath.read(group, "$.id");
         mvc.perform(get("/v1/groups").with(alice()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].id").value(groupId));
+                .andExpect(jsonPath("$.items[0].id").value(groupId))
+                // the creator is admin; permission travels with the group, not the member list
+                .andExpect(jsonPath("$.items[0].is_admin").value(true));
         mvc.perform(json(patch("/v1/groups/" + groupId).with(alice()), "{\"name\":\"Fam\",\"description\":null}"))
                 .andExpect(status().isOk());
 
@@ -360,6 +362,14 @@ class FullFlowIT {
         // bob (member) can now view the wishlist
         mvc.perform(get("/v1/wishlists/" + wishlistId).with(bob()))
                 .andExpect(status().isOk());
+        // shareable list is filtered in SQL: the just-shared list is gone for alice,
+        // and bob (who owns nothing here) sees an empty list
+        mvc.perform(get("/v1/groups/" + groupId + "/shareable-wishlists").with(alice()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+        mvc.perform(get("/v1/groups/" + groupId + "/shareable-wishlists").with(bob()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
     }
 
     // ---------- claims ----------
@@ -400,6 +410,10 @@ class FullFlowIT {
         String sharedView = perform(get("/v1/wishes").param("wishlist_id", wishlistId).with(bob()), 200);
         assertThat((Integer) JsonPath.read(sharedView, "$.items[0].remaining")).isZero();
         assertThat((List<?>) JsonPath.read(sharedView, "$.items[0].claims")).hasSize(2);
+        // participation and claimability are answered by the backend, not derived by clients
+        assertThat((Boolean) JsonPath.read(sharedView, "$.items[0].can_claim")).isFalse();
+        List<Boolean> bobParticipation = JsonPath.read(sharedView, "$.items[0].claims[*].is_participant");
+        assertThat(bobParticipation).containsExactlyInAnyOrder(true, false);
         // my-claims overview
         mvc.perform(get("/v1/claims").with(bob()))
                 .andExpect(status().isOk())
