@@ -4,17 +4,19 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
 import { hasAdminRole } from '../../auth/keycloak'
 import { AdSlot } from '../AdSlot'
+import { useT } from '../../i18n'
 
 export function AppShell() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const t = useT()
 
   const items = [
-    { label: 'My wishlists', icon: 'pi pi-list', command: () => navigate('/') },
-    { label: 'Groups', icon: 'pi pi-users', command: () => navigate('/groups') },
-    { label: 'My claims', icon: 'pi pi-gift', command: () => navigate('/claims') },
+    { label: t('nav.wishlists'), icon: 'pi pi-list', command: () => navigate('/') },
+    { label: t('nav.groups'), icon: 'pi pi-users', command: () => navigate('/groups') },
+    { label: t('nav.claims'), icon: 'pi pi-gift', command: () => navigate('/claims') },
     ...(hasAdminRole()
-      ? [{ label: 'Admin', icon: 'pi pi-shield', command: () => navigate('/admin') }]
+      ? [{ label: t('nav.admin'), icon: 'pi pi-shield', command: () => navigate('/admin') }]
       : []),
   ]
 
@@ -27,7 +29,13 @@ export function AppShell() {
         text
         onClick={() => navigate('/profile')}
       />
-      <Button icon="pi pi-sign-out" text severity="secondary" onClick={logout} aria-label="Logout" />
+      <Button
+        icon="pi pi-sign-out"
+        text
+        severity="secondary"
+        onClick={logout}
+        aria-label={t('nav.logout')}
+      />
     </div>
   )
 

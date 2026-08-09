@@ -9,6 +9,7 @@ import { getAdminStats, searchUsersByEmail, type AdminStats, type AdminUser } fr
 import { setTier } from '../api/users'
 import type { UserTier } from '../api/types'
 import { useApiToast } from '../hooks/useApiToast'
+import { useT } from '../i18n'
 
 /** App-admin console: aggregate numbers + tier management. No access to user content. */
 export function AdminPage() {
@@ -17,6 +18,7 @@ export function AdminPage() {
   const [results, setResults] = useState<AdminUser[]>([])
   const [searched, setSearched] = useState(false)
   const { showError, showSuccess } = useApiToast()
+  const t = useT()
 
   useEffect(() => {
     getAdminStats().then(setStats).catch(showError)
@@ -36,7 +38,7 @@ export function AdminPage() {
     try {
       await setTier(user.id, tier)
       setResults(results.map((r) => (r.id === user.id ? { ...r, tier } : r)))
-      showSuccess(`${user.email} is now ${tier}`)
+      showSuccess(t('admin.tierChanged', { email: user.email, tier }))
     } catch (e) {
       showError(e)
     }
@@ -45,38 +47,43 @@ export function AdminPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>Admin</h1>
+        <h1>{t('admin.title')}</h1>
       </div>
 
       <div className="card-grid" style={{ marginBottom: '1.5rem' }}>
-        <Card title="Users">
+        <Card title={t('admin.users')}>
           <span className="stat-number">{stats?.user_count ?? '…'}</span>
         </Card>
-        <Card title="Wishlists">
+        <Card title={t('admin.wishlists')}>
           <span className="stat-number">{stats?.wishlist_count ?? '…'}</span>
         </Card>
-        <Card title="Wishes">
+        <Card title={t('admin.wishes')}>
           <span className="stat-number">{stats?.wish_count ?? '…'}</span>
         </Card>
       </div>
 
-      <Card title="Tier management" subTitle="Search by email only; account data, no content access">
+      <Card title={t('admin.tierManagement')} subTitle={t('admin.tierHint')}>
         <div className="claim-row" style={{ marginBottom: '1rem' }}>
           <InputText
-            placeholder="email…"
+            placeholder={t('admin.emailPlaceholder')}
             value={email}
             style={{ flex: 1, maxWidth: 320 }}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && email.trim() && search()}
           />
-          <Button label="Search" icon="pi pi-search" disabled={!email.trim()} onClick={search} />
+          <Button
+            label={t('common.search')}
+            icon="pi pi-search"
+            disabled={!email.trim()}
+            onClick={search}
+          />
         </div>
         {searched && (
-          <DataTable value={results} dataKey="id" emptyMessage="No accounts match this email.">
-            <Column field="email" header="Email" />
-            <Column field="displayname" header="Displayname" />
+          <DataTable value={results} dataKey="id" emptyMessage={t('admin.noAccounts')}>
+            <Column field="email" header={t('common.email')} />
+            <Column field="displayname" header={t('admin.displayname')} />
             <Column
-              header="Tier"
+              header={t('admin.tier')}
               body={(user: AdminUser) => (
                 <Dropdown
                   value={user.tier}

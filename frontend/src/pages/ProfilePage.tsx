@@ -6,19 +6,20 @@ import { Dropdown } from 'primereact/dropdown'
 import { Tag } from 'primereact/tag'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { useAuth } from '../auth/AuthProvider'
-import { deleteOwnAccount, updateDisplayname, updateEmail, updatePassword } from '../api/users'
-import { updateLocale } from '../api/keycloakAccount'
+import { deleteOwnAccount, updateDisplayname, updateEmail, updateLocale, updatePassword } from '../api/users'
 import { Password } from 'primereact/password'
 import { keycloak } from '../auth/keycloak'
-import { currentLanguage } from '../i18n'
+import { setLanguage, useT } from '../i18n'
+import type { Locale } from '../api/types'
 import { useApiToast } from '../hooks/useApiToast'
 
 export function ProfilePage() {
   const { user, refreshUser, logout } = useAuth()
   const { showError, showSuccess } = useApiToast()
+  const t = useT()
   const [displayname, setDisplayname] = useState(user?.displayname ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
-  const [language, setLanguage] = useState(currentLanguage())
+  const [locale, setLocale] = useState<Locale>(user?.locale ?? 'EN')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
@@ -27,7 +28,7 @@ export function ProfilePage() {
     try {
       await updateDisplayname(displayname)
       await refreshUser()
-      showSuccess('Saved')
+      showSuccess(t('common.saved'))
     } catch (e) {
       showError(e)
     }
@@ -39,7 +40,7 @@ export function ProfilePage() {
       await updateEmail(email)
       await keycloak.updateToken(-1).catch(() => keycloak.login())
       await refreshUser()
-      showSuccess('Email updated')
+      showSuccess(t('profile.emailUpdated'))
     } catch (e) {
       showError(e)
     }
@@ -51,27 +52,32 @@ export function ProfilePage() {
       setCurrentPassword('')
       setNewPassword('')
       setRepeatPassword('')
-      showSuccess('Password changed')
+      showSuccess(t('profile.passwordChanged'))
     } catch (e) {
       showError(e)
     }
   }
 
-  const saveLanguage = async (locale: string) => {
-    setLanguage(locale)
+  /** The UI only switches once the backend stored the change; on failure the dropdown stays put. */
+  const saveLocale = async (next: Locale) => {
+    const previous = locale
+    setLocale(next)
     try {
-      await updateLocale(locale)
-      showSuccess('Language preference saved in your account')
+      const updated = await updateLocale(next)
+      setLanguage(updated.locale)
+      await refreshUser()
+      // t() is re-read here, so the confirmation already speaks the new language
+      showSuccess(t('profile.languageSaved'))
     } catch (e) {
+      setLocale(previous)
       showError(e)
     }
   }
 
   const removeAccount = () =>
     confirmDialog({
-      message:
-        'Delete your account? All your wishlists and groups become inaccessible. Logging in again within 30 days restores everything.',
-      header: 'Delete account',
+      message: t('profile.deleteAccountMessage'),
+      header: t('profile.deleteAccount'),
       icon: 'pi pi-exclamation-triangle',
       acceptClassName: 'p-button-danger',
       accept: async () => {
@@ -88,29 +94,52 @@ export function ProfilePage() {
     <div>
       <ConfirmDialog />
       <div className="page-header">
-        <h1>Profile</h1>
+        <h1>{t('profile.title')}</h1>
         {user?.tier === 'PREMIUM' && <Tag value="PREMIUM" />}
       </div>
 
-      <Card title="Display name" subTitle="Only used inside this app">
+      <Card title={t('profile.displayName')} subTitle={t('profile.displayNameHint')}>
         <div className="claim-row">
           <InputText value={displayname} maxLength={60} onChange={(e) => setDisplayname(e.target.value)} />
-          <Button label="Save" icon="pi pi-check" disabled={!displayname.trim()} onClick={saveDisplayname} />
+          <Button
+            label={t('common.save')}
+            icon="pi pi-check"
+            disabled={!displayname.trim()}
+            onClick={saveDisplayname}
+          />
+        </div>
+      </Card>
+      <br />
+
+      <Card title={t('profile.language')} subTitle={t('profile.languageHint')}>
+        <div className="form-field" style={{ maxWidth: 420 }}>
+          <label htmlFor="profile-language">{t('profile.interfaceLanguage')}</label>
+          <Dropdown
+            inputId="profile-language"
+            value={locale}
+            options={[
+              { label: 'Deutsch', value: 'DE' },
+              { label: 'English', value: 'EN' },
+            ]}
+            onChange={(e) => saveLocale(e.value as Locale)}
+          />
         </div>
       </Card>
       <br />
 
       {user?.identity_provider ? (
-        <Card title="Account" subTitle={`You sign in with ${user.identity_provider}`}>
+        <Card
+          title={t('profile.account')}
+          subTitle={t('profile.externalHint', { provider: user.identity_provider })}
+        >
           <p className="muted">
-            Email and password belong to your {user.identity_provider} account — change them
-            there. This app only stores your display name.
+            {t('profile.externalBody', { provider: user.identity_provider })}
           </p>
         </Card>
       ) : (
-      <Card title="Account" subTitle="Email is your login name; changes go through Keycloak">
+      <Card title={t('profile.account')} subTitle={t('profile.accountHint')}>
         <div className="form-field" style={{ maxWidth: 420 }}>
-          <label htmlFor="profile-email">Email</label>
+          <label htmlFor="profile-email">{t('common.email')}</label>
           <div className="claim-row">
             <InputText
               id="profile-email"
@@ -118,48 +147,42 @@ export function ProfilePage() {
               style={{ flex: 1 }}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <Button label="Change" icon="pi pi-check" disabled={email === user?.email} onClick={saveEmail} />
+            <Button
+              label={t('common.change')}
+              icon="pi pi-check"
+              disabled={email === user?.email}
+              onClick={saveEmail}
+            />
           </div>
         </div>
         <div className="form-field" style={{ maxWidth: 420 }}>
-          <label>Language (Keycloak account setting; the app itself follows your browser)</label>
-          <Dropdown
-            value={language}
-            options={[
-              { label: 'Deutsch', value: 'de' },
-              { label: 'English', value: 'en' },
-            ]}
-            onChange={(e) => saveLanguage(e.value)}
-          />
-        </div>
-        <div className="form-field" style={{ maxWidth: 420 }}>
-          <label>Change password</label>
+          <label>{t('profile.changePassword')}</label>
           <Password
             value={currentPassword}
-            placeholder="Current password"
+            placeholder={t('profile.currentPassword')}
             feedback={false}
             toggleMask
             onChange={(e) => setCurrentPassword(e.target.value)}
           />
           <Password
             value={newPassword}
-            placeholder="New password (min. 8 characters)"
+            placeholder={t('profile.newPassword')}
             toggleMask
             onChange={(e) => setNewPassword(e.target.value)}
           />
           <Password
             value={repeatPassword}
-            placeholder="Repeat new password"
+            placeholder={t('profile.repeatPassword')}
             feedback={false}
             toggleMask
             onChange={(e) => setRepeatPassword(e.target.value)}
           />
           {repeatPassword !== '' && newPassword !== repeatPassword && (
-            <small className="muted">Passwords do not match.</small>
+            <small className="muted">{t('profile.passwordMismatch')}</small>
           )}
           <div>
             <Button
-              label="Change password"
+              label={t('profile.changePassword')}
               icon="pi pi-key"
               disabled={
                 !currentPassword || newPassword.length < 8 || newPassword !== repeatPassword
@@ -172,8 +195,14 @@ export function ProfilePage() {
       )}
       <br />
 
-      <Card title="Danger zone">
-        <Button label="Delete account" icon="pi pi-trash" severity="danger" outlined onClick={removeAccount} />
+      <Card title={t('profile.dangerZone')}>
+        <Button
+          label={t('profile.deleteAccount')}
+          icon="pi pi-trash"
+          severity="danger"
+          outlined
+          onClick={removeAccount}
+        />
       </Card>
     </div>
   )

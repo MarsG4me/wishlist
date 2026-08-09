@@ -4,19 +4,21 @@ import { Card } from 'primereact/card'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { createWishlist, deleteWishlist, listWishlists, renameWishlist } from '../api/wishlists'
 import type { PageQuery, Wishlist } from '../api/types'
 import { useApiToast } from '../hooks/useApiToast'
 import { usePagedList } from '../hooks/usePagedList'
+import { CardActions } from '../components/CardActions'
 import { ListControls } from '../components/ListControls'
+import { useT } from '../i18n'
 
 export function MyWishlistsPage() {
   const [editing, setEditing] = useState<Wishlist | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
-  const navigate = useNavigate()
   const { showError, showSuccess } = useApiToast()
+  const t = useT()
 
   const fetcher = useCallback((page: PageQuery) => listWishlists(page), [])
   const list = usePagedList<Wishlist>(fetcher, showError)
@@ -37,7 +39,7 @@ export function MyWishlistsPage() {
       if (editing) await renameWishlist(editing.id, name)
       else await createWishlist(name)
       setDialogOpen(false)
-      showSuccess('Saved')
+      showSuccess(t('common.saved'))
       list.reload()
     } catch (e) {
       showError(e)
@@ -46,8 +48,8 @@ export function MyWishlistsPage() {
 
   const remove = (wishlist: Wishlist) =>
     confirmDialog({
-      message: `Delete wishlist "${wishlist.name}"? It can be restored within 30 days.`,
-      header: 'Delete wishlist',
+      message: t('wishlists.deleteMessage', { name: wishlist.name }),
+      header: t('wishlists.deleteHeader'),
       icon: 'pi pi-exclamation-triangle',
       acceptClassName: 'p-button-danger',
       accept: async () => {
@@ -64,21 +66,32 @@ export function MyWishlistsPage() {
     <div>
       <ConfirmDialog />
       <div className="page-header">
-        <h1>My wishlists</h1>
-        <Button label="New wishlist" icon="pi pi-plus" onClick={openCreate} />
+        <h1>{t('wishlists.title')}</h1>
+        <Button label={t('wishlists.new')} icon="pi pi-plus" onClick={openCreate} />
       </div>
       <div className="card-grid">
         {list.items.map((wishlist) => (
-          <Card key={wishlist.id} title={wishlist.name}>
-            <div className="claim-row">
-              <Button label="Open" icon="pi pi-arrow-right" text onClick={() => navigate(`/wishlists/${wishlist.id}`)} />
-              <Button icon="pi pi-pencil" text onClick={() => openRename(wishlist)} />
-              <Button icon="pi pi-trash" text severity="danger" onClick={() => remove(wishlist)} />
-            </div>
+          <Card
+            key={wishlist.id}
+            className="entity-card"
+            title={<Link to={`/wishlists/${wishlist.id}`}>{wishlist.name}</Link>}
+          >
+            <CardActions
+              items={[
+                { label: t('common.rename'), icon: 'pi pi-pencil', command: () => openRename(wishlist) },
+                { separator: true },
+                {
+                  label: t('common.delete'),
+                  icon: 'pi pi-trash',
+                  className: 'menu-item-danger',
+                  command: () => remove(wishlist),
+                },
+              ]}
+            />
           </Card>
         ))}
         {list.total === 0 && !list.loading && (
-          <p className="muted">No wishlists yet — create your first one.</p>
+          <p className="muted">{t('wishlists.empty')}</p>
         )}
       </div>
       <ListControls
@@ -93,16 +106,16 @@ export function MyWishlistsPage() {
         onLoadMore={list.loadMore}
       />
       <Dialog
-        header={editing ? 'Rename wishlist' : 'New wishlist'}
+        header={editing ? t('wishlists.renameHeader') : t('wishlists.newHeader')}
         visible={dialogOpen}
         style={{ width: 'min(400px, 95vw)' }}
         onHide={() => setDialogOpen(false)}
       >
         <div className="form-field">
-          <label htmlFor="list-name">Name</label>
+          <label htmlFor="list-name">{t('common.name')}</label>
           <InputText id="list-name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
         </div>
-        <Button label="Save" icon="pi pi-check" disabled={!name.trim()} onClick={save} />
+        <Button label={t('common.save')} icon="pi pi-check" disabled={!name.trim()} onClick={save} />
       </Dialog>
     </div>
   )

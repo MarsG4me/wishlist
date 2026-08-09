@@ -7,6 +7,7 @@ import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
 import type { OwnWish, WishLink } from '../api/types'
 import type { WishInput } from '../api/wishes'
+import { useT } from '../i18n'
 
 interface Props {
   visible: boolean
@@ -22,6 +23,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
   const [quantity, setQuantity] = useState<number>(1)
   const [links, setLinks] = useState<WishLink[]>([])
   const [saving, setSaving] = useState(false)
+  const t = useT()
 
   useEffect(() => {
     if (!visible) return
@@ -52,17 +54,17 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
 
   return (
     <Dialog
-      header={wish ? 'Edit wish' : 'New wish'}
+      header={wish ? t('wishes.editHeader') : t('wishes.newHeader')}
       visible={visible}
       style={{ width: 'min(480px, 95vw)' }}
       onHide={onHide}
     >
       <div className="form-field">
-        <label htmlFor="wish-name">Name</label>
+        <label htmlFor="wish-name">{t('common.name')}</label>
         <InputText id="wish-name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="form-field">
-        <label htmlFor="wish-desc">Description</label>
+        <label htmlFor="wish-desc">{t('common.description')}</label>
         <InputTextarea
           id="wish-desc"
           value={description}
@@ -73,8 +75,8 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
       </div>
       <div className="form-field">
         <label>
-          <Checkbox checked={unlimited} onChange={(e) => setUnlimited(!!e.checked)} /> Giftable
-          unlimited times
+          <Checkbox checked={unlimited} onChange={(e) => setUnlimited(!!e.checked)} />{' '}
+          {t('wishes.giftableUnlimited')}
         </label>
         {!unlimited && (
           <InputNumber
@@ -86,7 +88,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
         )}
       </div>
       <div className="form-field">
-        <label>Links</label>
+        <label>{t('wishes.links')}</label>
         {links.map((link, i) => (
           <div className="link-editor-row" key={i}>
             <InputText
@@ -95,7 +97,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
               onChange={(e) => setLink(i, { url: e.target.value })}
             />
             <InputText
-              placeholder="Label"
+              placeholder={t('wishes.linkLabel')}
               value={link.label ?? ''}
               onChange={(e) => setLink(i, { label: e.target.value || null })}
             />
@@ -108,14 +110,19 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
           </div>
         ))}
         <Button
-          label="Add link"
+          label={t('wishes.addLink')}
           icon="pi pi-plus"
           text
           disabled={links.length >= 20}
           onClick={() => setLinks([...links, { url: '', label: null }])}
         />
       </div>
-      <Button label="Save" icon="pi pi-check" disabled={!name.trim() || saving} onClick={save} />
+      <Button
+        label={t('common.save')}
+        icon="pi pi-check"
+        disabled={!name.trim() || saving}
+        onClick={save}
+      />
     </Dialog>
   )
 }

@@ -8,11 +8,12 @@ import { getWishlist } from '../api/wishlists'
 import { createWish, deleteWish, listWishes, updateWish, type WishInput } from '../api/wishes'
 import type { ListResponse, OwnWish, PageQuery, Wishlist } from '../api/types'
 import { WishFormDialog } from '../components/WishFormDialog'
+import { CardActions } from '../components/CardActions'
 import { ListControls } from '../components/ListControls'
 import { useApiToast } from '../hooks/useApiToast'
 import { usePagedList } from '../hooks/usePagedList'
 import { ApiError } from '../api/errors'
-import { tError } from '../i18n'
+import { tError, useT } from '../i18n'
 
 /** Own wishlist: full wish CRUD, structurally no claim information. */
 export function WishlistDetailPage() {
@@ -21,6 +22,7 @@ export function WishlistDetailPage() {
   const [editing, setEditing] = useState<OwnWish | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const { showError, showSuccess } = useApiToast()
+  const t = useT()
 
   const fetcher = useCallback((page: PageQuery) => listWishes(id!, page), [id])
   const list = usePagedList<OwnWish>(
@@ -44,18 +46,17 @@ export function WishlistDetailPage() {
         const updated = await updateWish(editing.id, input)
         if (updated.existing_claims_affected) {
           confirmDialog({
-            message:
-              'This wish already has claims. They stay valid, and the claimers are NOT notified of your change.',
-            header: 'Existing claims',
+            message: t('wishes.existingClaimsMessage'),
+            header: t('wishes.existingClaimsHeader'),
             icon: 'pi pi-info-circle',
             rejectClassName: 'hidden',
-            acceptLabel: 'Understood',
+            acceptLabel: t('common.understood'),
           })
         }
       } else if (id) {
         await createWish(id, input)
       }
-      showSuccess('Saved')
+      showSuccess(t('common.saved'))
       reload()
     } catch (e) {
       showError(e)
@@ -71,7 +72,7 @@ export function WishlistDetailPage() {
       if (e instanceof ApiError && e.errorCode === 'WISH_HAS_CLAIMS') {
         confirmDialog({
           message: tError('WISH_HAS_CLAIMS'),
-          header: 'Delete wish',
+          header: t('wishes.deleteHeader'),
           icon: 'pi pi-exclamation-triangle',
           acceptClassName: 'p-button-danger',
           accept: async () => {
@@ -93,12 +94,12 @@ export function WishlistDetailPage() {
     <div>
       <ConfirmDialog />
       <p>
-        <Link to="/">← My wishlists</Link>
+        <Link to="/">{t('wishlists.backLink')}</Link>
       </p>
       <div className="page-header">
         <h1>{wishlist?.name ?? '…'}</h1>
         <Button
-          label="New wish"
+          label={t('wishes.new')}
           icon="pi pi-plus"
           onClick={() => {
             setEditing(null)
@@ -108,9 +109,38 @@ export function WishlistDetailPage() {
       </div>
       <div className="card-grid">
         {wishes.map((wish) => (
-          <Card key={wish.id} title={wish.name}>
+          <Card
+            key={wish.id}
+            className="entity-card"
+            title={<Link to={`/wishes/${wish.id}`}>{wish.name}</Link>}
+          >
+            <CardActions
+              items={[
+                {
+                  label: t('common.edit'),
+                  icon: 'pi pi-pencil',
+                  command: () => {
+                    setEditing(wish)
+                    setDialogOpen(true)
+                  },
+                },
+                { separator: true },
+                {
+                  label: t('common.delete'),
+                  icon: 'pi pi-trash',
+                  className: 'menu-item-danger',
+                  command: () => remove(wish),
+                },
+              ]}
+            />
             {wish.description && <p>{wish.description}</p>}
-            <Tag value={wish.quantity === null ? 'unlimited' : `${wish.quantity}×`} />
+            <Tag
+              value={
+                wish.quantity === null
+                  ? t('common.unlimited')
+                  : t('wishes.quantity', { count: wish.quantity })
+              }
+            />
             <div className="wish-card-links">
               {wish.links.map((link, i) => (
                 <a key={i} href={link.url} target="_blank" rel="noreferrer">
@@ -118,20 +148,9 @@ export function WishlistDetailPage() {
                 </a>
               ))}
             </div>
-            <div className="claim-row">
-              <Button
-                icon="pi pi-pencil"
-                text
-                onClick={() => {
-                  setEditing(wish)
-                  setDialogOpen(true)
-                }}
-              />
-              <Button icon="pi pi-trash" text severity="danger" onClick={() => remove(wish)} />
-            </div>
           </Card>
         ))}
-        {list.total === 0 && !list.loading && <p className="muted">No wishes yet.</p>}
+        {list.total === 0 && !list.loading && <p className="muted">{t('wishes.empty')}</p>}
       </div>
       <ListControls
         total={list.total}

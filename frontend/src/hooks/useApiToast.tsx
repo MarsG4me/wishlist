@@ -1,7 +1,7 @@
 import { createContext, useContext, useRef, type ReactNode } from 'react'
 import { Toast } from 'primereact/toast'
 import { ApiError } from '../api/errors'
-import { tError } from '../i18n'
+import { t, tError } from '../i18n'
 
 type ToastFns = {
   showError: (error: unknown) => void
@@ -15,7 +15,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showError = (error: unknown) => {
     const detail = error instanceof ApiError ? tError(error.errorCode) : tError('INTERNAL_ERROR')
-    toast.current?.show({ severity: 'error', summary: 'Error', detail, life: 5000 })
+    // resolved on show, not on render: the toast must speak the language of the moment
+    toast.current?.show({ severity: 'error', summary: t('common.error'), detail, life: 5000 })
   }
   const showSuccess = (message: string) =>
     toast.current?.show({ severity: 'success', detail: message, life: 2500 })

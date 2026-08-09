@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { joinGroup } from '../api/memberships'
 import { ApiError } from '../api/errors'
-import { tError } from '../i18n'
+import { tError, useT } from '../i18n'
 
 /** Invite link landing page: redeems the code and forwards into the group. */
 export function JoinGroupPage() {
@@ -10,6 +10,7 @@ export function JoinGroupPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const attempted = useRef(false)
+  const t = useT()
 
   useEffect(() => {
     if (!code || attempted.current) return
@@ -25,5 +26,5 @@ export function JoinGroupPage() {
       })
   }, [code])
 
-  return <div className="app-loading">{error ?? 'Joining…'}</div>
+  return <div className="app-loading">{error ?? t('groups.joining')}</div>
 }

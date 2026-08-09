@@ -9,12 +9,14 @@ import { ClaimControls } from '../components/ClaimButton'
 import { ListControls } from '../components/ListControls'
 import { useApiToast } from '../hooks/useApiToast'
 import { usePagedList } from '../hooks/usePagedList'
+import { useT } from '../i18n'
 
 /** Group-member view of a shared wishlist: shows claims and lets members claim. */
 export function SharedWishlistPage() {
   const { groupId, id } = useParams<{ groupId: string; id: string }>()
   const [wishlist, setWishlist] = useState<Wishlist | null>(null)
   const { showError } = useApiToast()
+  const t = useT()
 
   const fetcher = useCallback((page: PageQuery) => listWishes(id!, page), [id])
   const list = usePagedList<SharedWish>(
@@ -29,20 +31,27 @@ export function SharedWishlistPage() {
   return (
     <div>
       <p>
-        <Link to={`/groups/${groupId}`}>← Group</Link>
+        <Link to={`/groups/${groupId}`}>{t('groups.backToGroup')}</Link>
       </p>
       <div className="page-header">
         <h1>{wishlist?.name ?? '…'}</h1>
       </div>
       <div className="card-grid">
         {list.items.map((wish) => (
-          <Card key={wish.id} title={wish.name}>
+          <Card
+            key={wish.id}
+            className="entity-card"
+            title={<Link to={`/wishes/${wish.id}`}>{wish.name}</Link>}
+          >
             {wish.description && <p>{wish.description}</p>}
             <Tag
               value={
                 wish.quantity === null
-                  ? 'unlimited'
-                  : `${wish.remaining} of ${wish.quantity} left`
+                  ? t('common.unlimited')
+                  : t('wishes.remaining', {
+                      remaining: wish.remaining ?? 0,
+                      quantity: wish.quantity,
+                    })
               }
               severity={wish.remaining === 0 ? 'warning' : undefined}
             />
@@ -56,7 +65,7 @@ export function SharedWishlistPage() {
             <ClaimControls wish={wish} onChanged={list.reload} />
           </Card>
         ))}
-        {list.total === 0 && !list.loading && <p className="muted">This wishlist is empty.</p>}
+        {list.total === 0 && !list.loading && <p className="muted">{t('wishes.sharedEmpty')}</p>}
       </div>
       <ListControls
         total={list.total}

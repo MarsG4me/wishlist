@@ -4,6 +4,7 @@ import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
 import { Tag } from 'primereact/tag'
 import type { Membership } from '../api/types'
+import { useT } from '../i18n'
 
 interface Props {
   members: Membership[]
@@ -18,21 +19,23 @@ interface Props {
  * admin, so all rows stay editable here ("Owner" tag is informational: the creator).
  */
 export function MemberTable({ members, ownUserId, canManage, onToggleAdmin, onRemove }: Props) {
+  const t = useT()
+
   return (
-    <DataTable value={members} dataKey="id" emptyMessage="No members">
-      <Column field="user.displayname" header="Member" />
+    <DataTable value={members} dataKey="id" emptyMessage={t('members.empty')}>
+      <Column field="user.displayname" header={t('members.member')} />
       <Column
-        header="Role"
+        header={t('members.role')}
         body={(m: Membership) => (
           <span className="claim-row">
-            {m.is_owner && <Tag value="Owner" />}
-            {m.is_admin && <Tag value="Admin" severity="info" />}
+            {m.is_owner && <Tag value={t('members.owner')} />}
+            {m.is_admin && <Tag value={t('members.admin')} severity="info" />}
           </span>
         )}
       />
       {canManage && (
         <Column
-          header="Admin"
+          header={t('members.admin')}
           body={(m: Membership) => (
             <InputSwitch checked={m.is_admin} onChange={(e) => onToggleAdmin(m, !!e.value)} />
           )}
@@ -46,7 +49,7 @@ export function MemberTable({ members, ownUserId, canManage, onToggleAdmin, onRe
           return (
             <Button
               icon={isSelf ? 'pi pi-sign-out' : 'pi pi-user-minus'}
-              label={isSelf ? 'Leave' : undefined}
+              label={isSelf ? t('common.leave') : undefined}
               severity="danger"
               text
               onClick={() => onRemove(m)}

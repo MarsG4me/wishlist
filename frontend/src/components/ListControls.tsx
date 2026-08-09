@@ -3,6 +3,7 @@ import { Paginator } from 'primereact/paginator'
 import { Dropdown } from 'primereact/dropdown'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { PAGE_SIZE_OPTIONS } from '../hooks/usePagedList'
+import { useT } from '../i18n'
 
 interface Props {
   total: number
@@ -33,6 +34,7 @@ export function ListControls({
   onLoadMore,
 }: Props) {
   const sentinel = useRef<HTMLDivElement>(null)
+  const t = useT()
 
   useEffect(() => {
     if (!isMobile || !hasMore || loading || !sentinel.current) return
@@ -45,7 +47,7 @@ export function ListControls({
 
   const sizePicker = (
     <span className="list-controls-size">
-      <label htmlFor="page-size">per page</label>
+      <label htmlFor="page-size">{t('common.perPage')}</label>
       <Dropdown
         inputId="page-size"
         value={limit}
@@ -61,7 +63,9 @@ export function ListControls({
         {sizePicker}
         <div ref={sentinel} className="list-sentinel">
           {loading && <ProgressSpinner style={{ width: 32, height: 32 }} />}
-          {!hasMore && total > 0 && <span className="muted">{total} in total</span>}
+          {!hasMore && total > 0 && (
+            <span className="muted">{t('common.inTotal', { total })}</span>
+          )}
         </div>
       </div>
     )

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { TabView, TabPanel } from 'primereact/tabview'
 import { Button } from 'primereact/button'
 import { Card } from 'primereact/card'
+import { Dialog } from 'primereact/dialog'
 import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
@@ -30,17 +31,21 @@ import { useAuth } from '../auth/AuthProvider'
 import { useApiToast } from '../hooks/useApiToast'
 import { usePagedList } from '../hooks/usePagedList'
 import { MemberTable } from '../components/MemberTable'
+import { CardActions } from '../components/CardActions'
 import { ListControls } from '../components/ListControls'
 import { InviteDialog } from '../components/InviteDialog'
+import { useT } from '../i18n'
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { showError, showSuccess } = useApiToast()
+  const t = useT()
 
   const [group, setGroup] = useState<Group | null>(null)
   const [shareTarget, setShareTarget] = useState<Wishlist | null>(null)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [shareable, setShareable] = useState<Wishlist[]>([])
   const [freshInvite, setFreshInvite] = useState<Invite | null>(null)
   const [inviteLimited, setInviteLimited] = useState(false)
@@ -56,7 +61,8 @@ export function GroupDetailPage() {
   const invitesFetcher = useCallback((page: PageQuery) => listInvites(id!, page), [id])
   const shares = usePagedList<SharedWishlist>(sharesFetcher, showError)
   const members = usePagedList<Membership>(membersFetcher, showError)
-  const invites = usePagedList<Invite>(invitesFetcher, showError, 20)
+  // invites are admin-only: fetching them as a plain member would only produce a 403 toast
+  const invites = usePagedList<Invite>(invitesFetcher, showError, 20, canManage)
 
   const loadGroup = useCallback(() => {
     if (!id) return
@@ -89,13 +95,31 @@ export function GroupDetailPage() {
     try {
       await shareWishlist(id, shareTarget.id)
       setShareTarget(null)
-      showSuccess('Shared')
+      setShareDialogOpen(false)
+      showSuccess(t('groups.shared'))
       shares.reload()
       loadShareable()
     } catch (e) {
       showError(e)
     }
   }
+
+  const unshare = (share: SharedWishlist) =>
+    confirmDialog({
+      message: t('groups.unshareMessage', { name: share.name }),
+      header: t('groups.unshareHeader'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptClassName: 'p-button-danger',
+      accept: async () => {
+        try {
+          await unshareWishlist(id, share.wishlist_id)
+          shares.reload()
+          loadShareable()
+        } catch (e) {
+          showError(e)
+        }
+      },
+    })
 
   const newInvite = async () => {
     try {
@@ -110,7 +134,7 @@ export function GroupDetailPage() {
   const saveSettings = async () => {
     try {
       await updateGroup(id, editName, editDescription || null)
-      showSuccess('Saved')
+      showSuccess(t('common.saved'))
       loadGroup()
     } catch (e) {
       showError(e)
@@ -119,8 +143,8 @@ export function GroupDetailPage() {
 
   const removeGroup = () =>
     confirmDialog({
-      message: `Delete group "${group.name}"? It can be restored within 30 days.`,
-      header: 'Delete group',
+      message: t('groups.deleteMessage', { name: group.name }),
+      header: t('groups.deleteHeader'),
       icon: 'pi pi-exclamation-triangle',
       acceptClassName: 'p-button-danger',
       accept: async () => {
@@ -134,73 +158,69 @@ export function GroupDetailPage() {
     })
 
   const inviteState = (invite: Invite) => {
-    if (invite.revoked_at) return <Tag value="revoked" severity="danger" />
-    if (new Date(invite.expires_at) < new Date()) return <Tag value="expired" severity="warning" />
+    if (invite.revoked_at) return <Tag value={t('invites.stateRevoked')} severity="danger" />
+    if (new Date(invite.expires_at) < new Date())
+      return <Tag value={t('invites.stateExpired')} severity="warning" />
     if (invite.max_uses !== null && invite.use_count >= invite.max_uses)
-      return <Tag value="exhausted" severity="warning" />
-    return <Tag value="active" severity="success" />
+      return <Tag value={t('invites.stateExhausted')} severity="warning" />
+    return <Tag value={t('invites.stateActive')} severity="success" />
   }
 
   return (
     <div>
       <ConfirmDialog />
       <p>
-        <Link to="/groups">← Groups</Link>
+        <Link to="/groups">{t('groups.backLink')}</Link>
       </p>
       <div className="page-header">
         <h1>{group.name}</h1>
       </div>
       <TabView>
-        <TabPanel header="Shared wishlists">
+        <TabPanel header={t('groups.tabShares')}>
           <div className="claim-row" style={{ marginBottom: '1rem' }}>
-            <Dropdown
-              value={shareTarget}
-              options={shareable}
-              optionLabel="name"
-              placeholder="Share one of my wishlists…"
-              emptyMessage="All your wishlists are already shared here"
-              onChange={(e) => setShareTarget(e.value)}
+            <Button
+              label={t('groups.shareWishlist')}
+              icon="pi pi-share-alt"
+              onClick={() => setShareDialogOpen(true)}
             />
-            <Button label="Share" icon="pi pi-share-alt" disabled={!shareTarget} onClick={share} />
           </div>
           <div className="card-grid">
-            {shares.items.map((share) => (
-              <Card key={share.wishlist_id} title={share.name} subTitle={`by ${share.owner.displayname}`}>
-                <div className="claim-row">
-                  {share.owner.id === user?.id ? (
-                    <Button
-                      label="Open (my list)"
-                      text
-                      onClick={() => navigate(`/wishlists/${share.wishlist_id}`)}
-                    />
-                  ) : (
-                    <Button
-                      label="Open"
-                      icon="pi pi-arrow-right"
-                      text
-                      onClick={() => navigate(`/groups/${id}/wishlists/${share.wishlist_id}`)}
-                    />
-                  )}
-                  {(share.owner.id === user?.id || canManage) && (
-                    <Button
-                      icon="pi pi-times"
-                      text
-                      severity="danger"
-                      onClick={async () => {
-                        try {
-                          await unshareWishlist(id, share.wishlist_id)
-                          shares.reload()
-                          loadShareable()
-                        } catch (e) {
-                          showError(e)
-                        }
-                      }}
-                    />
-                  )}
-                </div>
-              </Card>
-            ))}
-            {shares.total === 0 && !shares.loading && <p className="muted">Nothing shared yet.</p>}
+            {shares.items.map((entry) => {
+              // an own list stays the editable own view; other people's lists open the claim view
+              const own = entry.owner.id === user?.id
+              const target = own
+                ? `/wishlists/${entry.wishlist_id}`
+                : `/groups/${id}/wishlists/${entry.wishlist_id}`
+              return (
+                <Card
+                  key={entry.wishlist_id}
+                  className="entity-card"
+                  title={<Link to={target}>{entry.name}</Link>}
+                  subTitle={
+                    own ? t('groups.myList') : t('groups.byOwner', { name: entry.owner.displayname })
+                  }
+                >
+                  <CardActions
+                    label={t('groups.manageShare')}
+                    items={
+                      own || canManage
+                        ? [
+                            {
+                              label: t('groups.removeFromGroup'),
+                              icon: 'pi pi-times',
+                              className: 'menu-item-danger',
+                              command: () => unshare(entry),
+                            },
+                          ]
+                        : []
+                    }
+                  />
+                </Card>
+              )
+            })}
+            {shares.total === 0 && !shares.loading && (
+              <p className="muted">{t('groups.nothingShared')}</p>
+            )}
           </div>
           <ListControls
             total={shares.total}
@@ -215,7 +235,7 @@ export function GroupDetailPage() {
           />
         </TabPanel>
 
-        <TabPanel header="Members">
+        <TabPanel header={t('groups.tabMembers')}>
           <MemberTable
             members={members.items}
             ownUserId={user?.id ?? ''}
@@ -253,11 +273,11 @@ export function GroupDetailPage() {
         </TabPanel>
 
         {canManage && (
-          <TabPanel header="Invites">
+          <TabPanel header={t('groups.tabInvites')}>
             <div className="claim-row" style={{ marginBottom: '1rem' }}>
               <label>
-                <Checkbox checked={inviteLimited} onChange={(e) => setInviteLimited(!!e.checked)} /> Limit
-                uses
+                <Checkbox checked={inviteLimited} onChange={(e) => setInviteLimited(!!e.checked)} />{' '}
+                {t('invites.limitUses')}
               </label>
               {inviteLimited && (
                 <InputNumber
@@ -267,13 +287,13 @@ export function GroupDetailPage() {
                   onValueChange={(e) => setInviteMaxUses(e.value ?? 1)}
                 />
               )}
-              <Button label="New invite" icon="pi pi-plus" onClick={newInvite} />
+              <Button label={t('invites.new')} icon="pi pi-plus" onClick={newInvite} />
             </div>
-            <DataTable value={invites.items} dataKey="id" emptyMessage="No invites yet">
-              <Column field="code" header="Code" />
-              <Column header="Status" body={inviteState} />
+            <DataTable value={invites.items} dataKey="id" emptyMessage={t('invites.empty')}>
+              <Column field="code" header={t('invites.code')} />
+              <Column header={t('invites.status')} body={inviteState} />
               <Column
-                header="Uses"
+                header={t('invites.uses')}
                 body={(invite: Invite) => `${invite.use_count}${invite.max_uses ? ` / ${invite.max_uses}` : ''}`}
               />
               <Column
@@ -315,13 +335,13 @@ export function GroupDetailPage() {
         )}
 
         {canManage && (
-          <TabPanel header="Settings">
+          <TabPanel header={t('groups.tabSettings')}>
             <div className="form-field" style={{ maxWidth: 400 }}>
-              <label htmlFor="edit-name">Name</label>
+              <label htmlFor="edit-name">{t('common.name')}</label>
               <InputText id="edit-name" value={editName} maxLength={100} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div className="form-field" style={{ maxWidth: 400 }}>
-              <label htmlFor="edit-desc">Description</label>
+              <label htmlFor="edit-desc">{t('common.description')}</label>
               <InputTextarea
                 id="edit-desc"
                 value={editDescription}
@@ -331,12 +351,43 @@ export function GroupDetailPage() {
               />
             </div>
             <div className="claim-row">
-              <Button label="Save" icon="pi pi-check" disabled={!editName.trim()} onClick={saveSettings} />
-              <Button label="Delete group" icon="pi pi-trash" severity="danger" outlined onClick={removeGroup} />
+              <Button
+                label={t('common.save')}
+                icon="pi pi-check"
+                disabled={!editName.trim()}
+                onClick={saveSettings}
+              />
+              <Button
+                label={t('groups.delete')}
+                icon="pi pi-trash"
+                severity="danger"
+                outlined
+                onClick={removeGroup}
+              />
             </div>
           </TabPanel>
         )}
       </TabView>
+      <Dialog
+        header={t('groups.shareWishlist')}
+        visible={shareDialogOpen}
+        style={{ width: 'min(400px, 95vw)' }}
+        onHide={() => setShareDialogOpen(false)}
+      >
+        <div className="form-field">
+          <label htmlFor="share-target">{t('groups.shareDialogLabel')}</label>
+          <Dropdown
+            inputId="share-target"
+            value={shareTarget}
+            options={shareable}
+            optionLabel="name"
+            placeholder={t('groups.sharePlaceholder')}
+            emptyMessage={t('groups.shareEmpty')}
+            onChange={(e) => setShareTarget(e.value)}
+          />
+        </div>
+        <Button label={t('common.add')} icon="pi pi-plus" disabled={!shareTarget} onClick={share} />
+      </Dialog>
       <InviteDialog invite={freshInvite} onHide={() => setFreshInvite(null)} />
     </div>
   )
