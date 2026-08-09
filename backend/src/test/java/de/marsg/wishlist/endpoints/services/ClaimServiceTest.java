@@ -142,6 +142,66 @@ class ClaimServiceTest {
     }
 
     @Test
+    void joiningAPrivateClaimIsBlocked() {
+        UUID claimId = UUID.randomUUID();
+        ClaimEntity claim = new ClaimEntity(wishId, ownerId);
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+        mockWish(null);
+        WishlistEntity wishlist = mockWishlist(ownerId);
+        when(wishlist.getId()).thenReturn(wishlistId);
+        when(accessService.canViewAsSharedWishlist(requester, wishlistId)).thenReturn(true);
+        when(participantRepository.existsByWishesIdAndIdUsersId(wishId, requester)).thenReturn(false);
+
+        assertThatThrownBy(() -> claimService.join(requester, claimId))
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CLAIM_NOT_SHARED));
+        verify(participantRepository, never()).save(any());
+    }
+
+    @Test
+    void joiningASharedClaimAddsTheParticipant() {
+        UUID claimId = UUID.randomUUID();
+        ClaimEntity claim = new ClaimEntity(wishId, ownerId);
+        claim.setShared(true);
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+        mockWish(null);
+        WishlistEntity wishlist = mockWishlist(ownerId);
+        when(wishlist.getId()).thenReturn(wishlistId);
+        when(accessService.canViewAsSharedWishlist(requester, wishlistId)).thenReturn(true);
+        when(participantRepository.existsByWishesIdAndIdUsersId(wishId, requester)).thenReturn(false);
+        when(participantRepository.findByIdClaimsId(claim.getId())).thenReturn(List.of());
+        when(userRepository.findAllById(List.of())).thenReturn(List.of());
+
+        claimService.join(requester, claimId);
+
+        verify(participantRepository).save(any(ClaimParticipantEntity.class));
+    }
+
+    @Test
+    void onlyTheClaimCreatorMayShareIt() {
+        UUID claimId = UUID.randomUUID();
+        ClaimEntity claim = new ClaimEntity(wishId, ownerId);
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+
+        assertThatThrownBy(() -> claimService.setShared(requester, claimId, true))
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOT_CLAIM_OWNER));
+        assertThat(claim.isShared()).isFalse();
+    }
+
+    @Test
+    void creatorTogglesSharing() {
+        UUID claimId = UUID.randomUUID();
+        ClaimEntity claim = new ClaimEntity(wishId, requester);
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+        when(participantRepository.findByIdClaimsId(claim.getId())).thenReturn(List.of());
+        when(userRepository.findAllById(List.of())).thenReturn(List.of());
+
+        assertThat(claimService.setShared(requester, claimId, true).isShared()).isTrue();
+        assertThat(claim.isShared()).isTrue();
+    }
+
+    @Test
     void leavingAsLastParticipantDeletesClaim() {
         UUID claimId = UUID.randomUUID();
         ClaimParticipantEntity participant = new ClaimParticipantEntity(claimId, requester, wishId);

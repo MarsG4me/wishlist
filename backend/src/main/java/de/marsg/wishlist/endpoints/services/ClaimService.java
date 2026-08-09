@@ -68,19 +68,38 @@ public class ClaimService {
         ClaimEntity claim = claimRepository.save(new ClaimEntity(wishId, userId));
         participantRepository.save(new ClaimParticipantEntity(claim.getId(), userId, wishId));
         log.info("User {} claimed wish {} (claim {})", userId, wishId, claim.getId());
-        // the requester just created it, so they are a participant by definition
-        return new ReturnWishClaimDTO(claim.getId(), participantNames(claim.getId()), true);
+        // the requester just created it, so they are its participant and owner by definition
+        return mine(userId, claim);
     }
 
-    /** Joining an existing claim (money pooling) does not consume a wish unit. */
+    /**
+     * Joining an existing claim (money pooling) does not consume a wish unit, but the
+     * claim's creator decides whether that is allowed at all — the wish owner never does.
+     */
     @Transactional
     public ReturnWishClaimDTO join(UUID userId, UUID claimId) {
         ClaimEntity claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new ApiException(ErrorCode.CLAIM_NOT_FOUND));
         lockedClaimableWish(userId, claim.getWishesId());
+        if (!claim.isShared()) {
+            throw new ApiException(ErrorCode.CLAIM_NOT_SHARED);
+        }
         participantRepository.save(new ClaimParticipantEntity(claimId, userId, claim.getWishesId()));
         log.info("User {} joined claim {}", userId, claimId);
-        return new ReturnWishClaimDTO(claimId, participantNames(claimId), true);
+        return mine(userId, claim);
+    }
+
+    /** Opening/closing a claim for co-claimers is the creator's call alone. */
+    @Transactional
+    public ReturnWishClaimDTO setShared(UUID userId, UUID claimId, boolean shared) {
+        ClaimEntity claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new ApiException(ErrorCode.CLAIM_NOT_FOUND));
+        if (!userId.equals(claim.getUsersId())) {
+            throw new ApiException(ErrorCode.NOT_CLAIM_OWNER);
+        }
+        claim.setShared(shared);
+        log.info("User {} set claim {} shared={}", userId, claimId, shared);
+        return mine(userId, claim);
     }
 
     /** Leaving as the last participant hard-deletes the claim, freeing the wish unit. */
@@ -131,7 +150,8 @@ public class ClaimService {
                     }
                     return new ReturnMyClaimDTO(claim.getId(), wish.getId(), wish.getName(),
                             wishlist.getId(), wishlist.getName(), owners.get(wishlist.getUsersId()),
-                            participantNames(claim.getId()));
+                            participantNames(claim.getId()), userId.equals(claim.getUsersId()),
+                            claim.isShared());
                 })
                 .filter(Objects::nonNull)
                 .toList());
@@ -157,6 +177,15 @@ public class ClaimService {
             throw new ApiException(ErrorCode.ALREADY_CLAIMED);
         }
         return wish;
+    }
+
+    /**
+     * A claim the requester just created, joined or reconfigured: they participate in it
+     * by definition, so joining again is never an option here.
+     */
+    private ReturnWishClaimDTO mine(UUID userId, ClaimEntity claim) {
+        return new ReturnWishClaimDTO(claim.getId(), participantNames(claim.getId()), true,
+                userId.equals(claim.getUsersId()), claim.isShared(), false);
     }
 
     private List<ReturnSimpleUserDTO> participantNames(UUID claimId) {

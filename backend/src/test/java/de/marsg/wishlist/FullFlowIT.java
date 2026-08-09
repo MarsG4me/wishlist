@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import de.marsg.wishlist.endpoints.services.KeycloakAccountClient;
+import de.marsg.wishlist.helpers.ApiException;
+import de.marsg.wishlist.helpers.ErrorCode;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.MethodOrderer;
@@ -160,6 +162,8 @@ class FullFlowIT {
         aliceId = JsonPath.read(body, "$.id");
         assertThat((String) JsonPath.read(body, "$.displayname")).isEqualTo("Alice Anderson");
         assertThat((String) JsonPath.read(body, "$.tier")).isEqualTo("FREE");
+        // no locale claim in the token -> English until the user picks a language
+        assertThat((String) JsonPath.read(body, "$.locale")).isEqualTo("EN");
         bobId = JsonPath.read(perform(get("/v1/users/me").with(bob()), 200), "$.id");
     }
 
@@ -224,6 +228,67 @@ class FullFlowIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].email").value("alice.new@it.local"))
                 .andExpect(jsonPath("$.items[0].tier").value("PREMIUM"));
+    }
+
+    // ---------- interface language ----------
+
+    @Test
+    @Order(16)
+    void languageChangeIsStoredHereAndMirroredIntoKeycloak() throws Exception {
+        mvc.perform(json(patch("/v1/users/me/locale").with(alice()), "{\"locale\":\"DE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locale").value("DE"));
+        Mockito.verify(keycloakAccountClient).updateLocale(Mockito.any(UUID.class), Mockito.eq("de"));
+        // the change is what the next page load reads, no Keycloak round trip involved
+        mvc.perform(get("/v1/users/me").with(alice()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locale").value("DE"));
+    }
+
+    @Test
+    @Order(17)
+    void unshippedLanguageIsRejected() throws Exception {
+        mvc.perform(json(patch("/v1/users/me/locale").with(alice()), "{\"locale\":\"FR\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error_code").value("MISSING_REQUEST_BODY"));
+        mvc.perform(json(patch("/v1/users/me/locale").with(alice()), "{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error_code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @Order(18)
+    void languageStillChangesWhenKeycloakIsDown() throws Exception {
+        Mockito.doThrow(new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED))
+                .when(keycloakAccountClient).updateLocale(Mockito.any(UUID.class), Mockito.eq("en"));
+        mvc.perform(json(patch("/v1/users/me/locale").with(alice()), "{\"locale\":\"EN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locale").value("EN"));
+        Mockito.doNothing().when(keycloakAccountClient).updateLocale(Mockito.any(UUID.class), Mockito.anyString());
+    }
+
+    @Test
+    @Order(19)
+    void externalProviderAccountKeepsTheLanguageSetting() throws Exception {
+        // email and password are refused for these accounts; the language belongs to us
+        RequestPostProcessor google = jwt()
+                .jwt(jwt -> jwt.subject(UUID.randomUUID().toString())
+                        .claim("given_name", "Greta")
+                        .claim("family_name", "Green")
+                        .claim("email", "greta@it.local")
+                        .claim("locale", "de-DE")
+                        .claim("identity_provider", "google"))
+                .authorities(List.of(new SimpleGrantedAuthority("ROLE_user")));
+        // the Keycloak locale claim seeds the account on provisioning
+        mvc.perform(get("/v1/users/me").with(google))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locale").value("DE"));
+        mvc.perform(json(patch("/v1/users/me/email").with(google), "{\"email\":\"greta2@it.local\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error_code").value("ACCOUNT_MANAGED_EXTERNALLY"));
+        mvc.perform(json(patch("/v1/users/me/locale").with(google), "{\"locale\":\"EN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locale").value("EN"));
     }
 
     // ---------- wishlists & wishes ----------
@@ -383,7 +448,18 @@ class FullFlowIT {
                 .andExpect(jsonPath("$.error_code").value("CANNOT_CLAIM_OWN_WISH"));
         bobClaimId = JsonPath.read(perform(json(post("/v1/claims").with(bob()),
                 "{\"wish_id\":\"" + wishId + "\"}"), 201), "$.claim_id");
-        // carol pools money on bob's claim
+        // a fresh claim is private: co-claiming is bob's call, not the wish owner's
+        mvc.perform(post("/v1/claims/" + bobClaimId + "/participants").with(carol()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error_code").value("CLAIM_NOT_SHARED"));
+        // only bob may open his own claim
+        mvc.perform(json(patch("/v1/claims/" + bobClaimId).with(carol()), "{\"is_shared\":true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error_code").value("NOT_CLAIM_OWNER"));
+        mvc.perform(json(patch("/v1/claims/" + bobClaimId).with(bob()), "{\"is_shared\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.is_shared").value(true));
+        // carol pools money on bob's now-shared claim
         mvc.perform(post("/v1/claims/" + bobClaimId + "/participants").with(carol()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.participants.length()").value(2));

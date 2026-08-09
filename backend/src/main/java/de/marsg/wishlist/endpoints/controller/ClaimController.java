@@ -3,6 +3,7 @@ package de.marsg.wishlist.endpoints.controller;
 import de.marsg.wishlist.configs.security.AuthenticatedUser;
 import de.marsg.wishlist.endpoints.dto.claims.CreateClaimDTO;
 import de.marsg.wishlist.endpoints.dto.claims.ReturnMyClaimDTO;
+import de.marsg.wishlist.endpoints.dto.claims.UpdateClaimSharingDTO;
 import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.ReturnWishClaimDTO;
 import de.marsg.wishlist.endpoints.services.ClaimService;
@@ -13,6 +14,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,9 +50,16 @@ public class ClaimController {
         return claimService.create(user.userId(), body.wishId());
     }
 
+    @PatchMapping("/{id}")
+    @Operation(summary = "Open the claim for co-claimers or close it again (claim creator only)")
+    public ReturnWishClaimDTO setShared(AuthenticatedUser user, @PathVariable("id") UUID id,
+            @Valid @RequestBody UpdateClaimSharingDTO body) {
+        return claimService.setShared(user.userId(), id, body.isShared());
+    }
+
     @PostMapping("/{id}/participants")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Join an existing claim to pool money (co-claiming)")
+    @Operation(summary = "Join an existing claim to pool money; requires the creator to have shared it")
     public ReturnWishClaimDTO join(AuthenticatedUser user, @PathVariable("id") UUID id) {
         return claimService.join(user.userId(), id);
     }

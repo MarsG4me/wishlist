@@ -4,6 +4,7 @@ import de.marsg.wishlist.configs.security.AuthenticatedUser;
 import de.marsg.wishlist.endpoints.dto.users.ReturnOwnUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateEmailDTO;
+import de.marsg.wishlist.endpoints.dto.users.UpdateLocaleDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdatePasswordDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateTierDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateUserDTO;
@@ -57,6 +58,13 @@ public class UserController {
             @Valid @RequestBody UpdateEmailDTO body) {
         assertLocalAccount(user);
         return userService.updateEmail(user.userId(), jwt.getTokenValue(), body.email());
+    }
+
+    @PatchMapping("/me/locale")
+    @Operation(summary = "Set the interface language. Stored here and mirrored into Keycloak "
+            + "(best effort); allowed for external-provider accounts too")
+    public ReturnOwnUserDTO updateLocale(AuthenticatedUser user, @Valid @RequestBody UpdateLocaleDTO body) {
+        return userService.updateLocale(user.userId(), user.identityProvider(), body.locale());
     }
 
     @PatchMapping("/me/password")

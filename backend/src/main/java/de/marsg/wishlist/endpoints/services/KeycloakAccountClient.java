@@ -2,6 +2,8 @@ package de.marsg.wishlist.endpoints.services;
 
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -24,6 +26,7 @@ import org.springframework.web.client.RestClientException;
  * Password: current password is verified via a direct-grant login, then the new
  * password is set through the Admin API using the backend's service account —
  * so the password UI can live inside the app without any redirect to Keycloak.
+ * Locale: mirrored through the Admin API; our DB owns the value (see UserService).
  */
 @Component
 public class KeycloakAccountClient {
@@ -61,6 +64,47 @@ public class KeycloakAccountClient {
                     .toBodilessEntity();
         } catch (RestClientException e) {
             log.warn("Keycloak rejected email update: {}", e.getMessage());
+            throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
+        }
+    }
+
+    /**
+     * Mirrors the interface language into the Keycloak {@code locale} attribute so login
+     * pages and account emails match the app. The Admin API is used on purpose: the user's
+     * own app token has no {@code account} audience, so the Account API answers 401.
+     *
+     * <p>The update replaces the whole user representation — a body carrying only the
+     * attributes drops email and username and is rejected — so the current representation
+     * is read first and sent back with just the locale entry overwritten.
+     */
+    public void updateLocale(UUID keycloakId, String locale) {
+        String token = serviceAccountToken();
+        try {
+            Map<?, ?> current = restClient.get()
+                    .uri("/admin/realms/{realm}/users/{id}", realm, keycloakId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .body(Map.class);
+            if (current == null) {
+                throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
+            }
+            Map<String, Object> user = new HashMap<>();
+            current.forEach((key, value) -> user.put(String.valueOf(key), value));
+            Map<String, Object> attributes = new HashMap<>();
+            if (user.get("attributes") instanceof Map<?, ?> existing) {
+                existing.forEach((key, value) -> attributes.put(String.valueOf(key), value));
+            }
+            attributes.put("locale", List.of(locale));
+            user.put("attributes", attributes);
+            restClient.put()
+                    .uri("/admin/realms/{realm}/users/{id}", realm, keycloakId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(user)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException e) {
+            log.warn("Keycloak rejected locale update for {}: {}", keycloakId, e.getMessage());
             throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
         }
     }

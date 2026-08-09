@@ -14,8 +14,41 @@
   ],
   "defaultLocale": "en",
   "sslRequired": "external",
+  "defaultRole": {
+    "name": "default-roles-wishlist-dev",
+    "description": "${role_default-roles}",
+    "composite": true,
+    "clientRole": false
+  },
   "roles": {
     "realm": [
+      {
+        "name": "default-roles-wishlist-dev",
+        "description": "${role_default-roles}",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "user",
+            "offline_access",
+            "uma_authorization"
+          ],
+          "client": {
+            "account": [
+              "view-profile",
+              "manage-account"
+            ]
+          }
+        },
+        "clientRole": false
+      },
+      {
+        "name": "offline_access",
+        "description": "${role_offline-access}"
+      },
+      {
+        "name": "uma_authorization",
+        "description": "${role_uma_authorization}"
+      },
       {
         "name": "user",
         "description": "Regular application user"

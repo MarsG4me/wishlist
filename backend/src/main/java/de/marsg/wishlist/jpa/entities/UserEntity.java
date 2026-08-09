@@ -35,13 +35,19 @@ public class UserEntity extends SoftDeletable {
     @Column(name = "tier", nullable = false)
     private UserTier tier = UserTier.FREE;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "locale", nullable = false)
+    private UserLocale locale = UserLocale.EN;
+
     protected UserEntity() {
     }
 
-    public UserEntity(UUID keycloakId, String displayname, String email) {
+    public UserEntity(UUID keycloakId, String displayname, String email, UserLocale locale) {
         this.keycloakId = keycloakId;
         this.displayname = displayname;
         this.email = email;
+        this.locale = locale;
     }
 
     public UUID getId() {
@@ -74,5 +80,13 @@ public class UserEntity extends SoftDeletable {
 
     public void setTier(UserTier tier) {
         this.tier = tier;
+    }
+
+    public UserLocale getLocale() {
+        return locale;
+    }
+
+    public void setLocale(UserLocale locale) {
+        this.locale = locale;
     }
 }

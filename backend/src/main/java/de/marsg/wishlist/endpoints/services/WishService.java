@@ -152,10 +152,14 @@ public class WishService {
         }
         Map<UUID, List<ReturnWishClaimDTO>> result = new LinkedHashMap<>();
         for (ClaimEntity claim : claimRepository.findByWishesIdIn(wishIds)) {
+            // canJoin needs the sibling claims of the wish, so ReturnSharedWishDTO fills it in
             result.computeIfAbsent(claim.getWishesId(), k -> new ArrayList<>())
                     .add(new ReturnWishClaimDTO(claim.getId(),
                             participantsByClaim.getOrDefault(claim.getId(), List.of()),
-                            claimsOfRequester.contains(claim.getId())));
+                            claimsOfRequester.contains(claim.getId()),
+                            requesterId.equals(claim.getUsersId()),
+                            claim.isShared(),
+                            false));
         }
         return result;
     }

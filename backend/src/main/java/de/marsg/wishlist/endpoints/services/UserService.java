@@ -5,6 +5,7 @@ import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.jpa.entities.UserEntity;
+import de.marsg.wishlist.jpa.entities.UserLocale;
 import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
 import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
@@ -59,6 +60,24 @@ public class UserService {
         user.setEmail(newEmail);
         log.info("Updated email of user {}", userId);
         return ReturnOwnUserDTO.from(user, null);
+    }
+
+    /**
+     * The interface language belongs to this app, so our DB is the source of truth and the
+     * change always succeeds. Keycloak only gets the value mirrored for its own login pages
+     * and emails — a failure there is logged, never surfaced to the user.
+     */
+    @Transactional
+    public ReturnOwnUserDTO updateLocale(UUID userId, String identityProvider, UserLocale locale) {
+        UserEntity user = requireUser(userId);
+        user.setLocale(locale);
+        try {
+            keycloakAccountClient.updateLocale(user.getKeycloakId(), locale.tag());
+        } catch (ApiException e) {
+            log.warn("Locale of user {} stored but not mirrored into Keycloak", userId);
+        }
+        log.info("Set locale of user {} to {}", userId, locale);
+        return ReturnOwnUserDTO.from(user, identityProvider);
     }
 
     /** Verifies the current password, then resets via Keycloak Admin API. Nothing stored in our DB. */

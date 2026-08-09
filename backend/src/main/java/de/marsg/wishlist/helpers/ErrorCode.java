@@ -52,6 +52,9 @@ public enum ErrorCode {
     CANNOT_CLAIM_OWN_WISH(HttpStatus.FORBIDDEN, "You cannot claim your own wish"),
     ALREADY_CLAIMED(HttpStatus.CONFLICT, "You already claim or participate in a claim of this wish"),
     WISH_FULLY_CLAIMED(HttpStatus.CONFLICT, "All units of this wish are already claimed"),
+    CLAIM_NOT_SHARED(HttpStatus.FORBIDDEN,
+            "This claim is not open for co-claimers; only its creator can open it up"),
+    NOT_CLAIM_OWNER(HttpStatus.FORBIDDEN, "Only the creator of this claim can change it"),
 
     INVALID_CREDENTIALS(HttpStatus.FORBIDDEN, "The current password is incorrect"),
     ACCOUNT_MANAGED_EXTERNALLY(HttpStatus.CONFLICT,

@@ -23,7 +23,8 @@ def test_full_flow(as_user):
     alice.get_by_role("button", name="Save").click()
     card = alice.locator(".p-card", has_text=LIST_NAME)
     expect(card).to_be_visible()
-    card.get_by_role("button", name="Open").click()
+    # the card IS the link to its entity - no separate "Open" button any more
+    card.get_by_role("link", name=LIST_NAME).click()
 
     alice.get_by_role("button", name="New wish").click()
     alice.fill("#wish-name", WISH_NAME)
@@ -37,7 +38,7 @@ def test_full_flow(as_user):
     alice.get_by_role("button", name="Create").click()
     group_card = alice.locator(".p-card", has_text=GROUP_NAME)
     expect(group_card).to_be_visible()
-    group_card.get_by_role("button", name="Open").click()
+    group_card.get_by_role("link", name=GROUP_NAME).click()
 
     alice.get_by_role("tab", name="Invites").click()
     alice.get_by_role("button", name="New invite").click()
@@ -47,9 +48,10 @@ def test_full_flow(as_user):
 
     # --- alice shares the wishlist into the group ---
     alice.get_by_role("tab", name="Shared wishlists").click()
-    alice.get_by_role("button", name="Share one of my wishlists").click()
+    alice.get_by_role("button", name="Share wishlist").click()
+    alice.get_by_role("button", name="Select one of my wishlists").click()
     alice.get_by_role("option", name=LIST_NAME).click()
-    alice.get_by_role("button", name="Share", exact=True).click()
+    alice.get_by_role("button", name="Add", exact=True).click()
     expect(alice.locator(".p-card", has_text=LIST_NAME)).to_be_visible()
 
     # --- bob joins via the invite link and claims the wish ---
@@ -58,12 +60,14 @@ def test_full_flow(as_user):
     expect(bob.get_by_role("tab", name="Shared wishlists")).to_be_visible(timeout=15_000)
     shared_card = bob.locator(".p-card", has_text=LIST_NAME)
     expect(shared_card).to_be_visible()
-    shared_card.get_by_role("button", name="Open", exact=True).click()
+    shared_card.get_by_role("link", name=LIST_NAME).click()
 
     wish_card = bob.locator(".p-card", has_text=WISH_NAME)
     expect(wish_card).to_be_visible()
-    wish_card.get_by_role("button", name="Claim").click()
+    wish_card.get_by_role("button", name="Claim", exact=True).click()
     expect(wish_card.locator(".p-chip", has_text="Bob")).to_be_visible()
+    # co-claiming is bob's call as the claimer, not alice's as the wish owner
+    expect(wish_card.get_by_role("button", name="Let others chip in")).to_be_visible()
 
     # --- bob sees his claim in the overview ---
     bob.goto("http://localhost:5173/claims")
@@ -71,7 +75,7 @@ def test_full_flow(as_user):
 
     # --- the owner must never see the claim ---
     alice.goto("http://localhost:5173/")
-    alice.locator(".p-card", has_text=LIST_NAME).get_by_role("button", name="Open").click()
+    alice.locator(".p-card", has_text=LIST_NAME).get_by_role("link", name=LIST_NAME).click()
     owner_card = alice.locator(".p-card", has_text=WISH_NAME)
     expect(owner_card).to_be_visible()
     expect(owner_card.locator(".p-chip")).to_have_count(0)

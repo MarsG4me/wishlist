@@ -3,6 +3,7 @@ package de.marsg.wishlist.endpoints.services;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.jpa.entities.UserEntity;
+import de.marsg.wishlist.jpa.entities.UserLocale;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -58,7 +59,8 @@ public class UserProvisioningService {
                     keycloakId, existing.getId());
             throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
         });
-        UserEntity created = userRepository.save(new UserEntity(keycloakId, displaynameFrom(jwt), email));
+        UserEntity created = userRepository.save(new UserEntity(keycloakId, displaynameFrom(jwt), email,
+                UserLocale.fromTag(jwt.getClaimAsString("locale"))));
         log.info("Provisioned new user {}", created.getId());
         return created;
     }
