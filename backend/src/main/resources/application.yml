@@ -5,7 +5,7 @@ spring:
   application:
     name: wishlist-backend
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/wishlist}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/wishlist}
     username: ${DB_USER:wishlist}
     password: ${DB_PASSWORD:wishlist}
   jpa:

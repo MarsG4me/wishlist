@@ -43,7 +43,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:6543/v1/users/me
 | Var | Default |
 |-----|---------|
 | `SERVER_PORT` | `6543` |
-| `DB_URL` | `jdbc:postgresql://localhost:5432/wishlist` |
+| `DB_URL` | `jdbc:postgresql://localhost:5433/wishlist` (compose maps 5433→5432 to avoid clashing with a system Postgres) |
 | `DB_USER` / `DB_PASSWORD` | `wishlist` / `wishlist` |
 | `KEYCLOAK_ISSUER_URI` | `http://localhost:8180/realms/wishlist-dev` |
 | `KEYCLOAK_ACCOUNT_URL` | `http://localhost:8180/realms/wishlist-dev/account` |

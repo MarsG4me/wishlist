@@ -1,0 +1,47 @@
+package de.marsg.wishlist.configs.security;
+
+import de.marsg.wishlist.endpoints.services.UserProvisioningService;
+import de.marsg.wishlist.helpers.ApiException;
+import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.jpa.entities.UserEntity;
+import org.springframework.core.MethodParameter;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;
+
+/** Resolves {@link AuthenticatedUser} controller parameters, provisioning the user on first contact. */
+@Component
+public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
+
+    private static final String ADMIN_AUTHORITY = "ROLE_admin";
+
+    private final UserProvisioningService provisioningService;
+
+    public CurrentUserArgumentResolver(UserProvisioningService provisioningService) {
+        this.provisioningService = provisioningService;
+    }
+
+    @Override
+    public boolean supportsParameter(MethodParameter parameter) {
+        return AuthenticatedUser.class.equals(parameter.getParameterType());
+    }
+
+    @Override
+    public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+            NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication instanceof JwtAuthenticationToken jwtAuth)) {
+            throw new ApiException(ErrorCode.UNAUTHENTICATED);
+        }
+        UserEntity user = provisioningService.provision(jwtAuth.getToken());
+        boolean isAdmin = jwtAuth.getAuthorities().stream()
+                .anyMatch(a -> ADMIN_AUTHORITY.equals(a.getAuthority()));
+        return new AuthenticatedUser(user.getId(), user.getKeycloakId(), user.getDisplayname(),
+                user.getTier(), isAdmin);
+    }
+}
