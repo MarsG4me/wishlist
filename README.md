@@ -50,6 +50,19 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:6543/v1/users/me
 | `FRONTEND_ORIGIN` | `http://localhost:5173` |
 | `PURGE_ENABLED` | `false` (opt-in scheduled purge of soft-deleted rows > 30 days) |
 
+## Testing
+
+Three layers — every endpoint is covered, plus a real-browser flow:
+
+| Layer | What | How to run |
+|-------|------|------------|
+| Unit tests | UUIDv7, limits, claim rules, invite joining | `cd backend && mvn test` |
+| Full-flow integration | EVERY `/v1` endpoint in dependency order against real Postgres 18 (Flyway schema, constraints, locks); JWTs injected, no Keycloak needed | CI: `mvn verify -Pit` (Testcontainers). Locally (firewall blocks Testcontainers): `backend/scripts/integration_test_local.sh` (uses the dev-stack PG with a throwaway DB) |
+| Browser E2E (Python/Playwright) | Real Keycloak login, wishlist→group→invite→join→share→claim, owner-invisibility check | `cd tests/e2e && pip install -r requirements.txt && playwright install chromium && pytest` (dev stack + backend + frontend must be running) |
+| Manual per-endpoint | Swagger UI with bearer auth | `http://localhost:6543/docs/api-ui.html`; scripted variant: `backend/scripts/smoke.sh` |
+
+CI (`.github/workflows/ci.yml`) runs all three layers on every push/PR.
+
 ## Conventions
 
 - All endpoints versioned: `/v1/...`

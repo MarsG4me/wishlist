@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# python e2e
+tests/e2e/.venv/
+tests/e2e/.pytest_cache/
+__pycache__/
