@@ -35,11 +35,16 @@ interface PagedList<T> {
 /**
  * Drives a paged list endpoint. Mobile keeps appending to one growing list,
  * desktop replaces the page — the fetch call is identical, only the merge differs.
+ *
+ * `enabled` guards endpoints the requester may not be allowed to call at all
+ * (an admin-only sub-resource, say): while false nothing is fetched, so no
+ * permission error can reach the user as a toast.
  */
 export function usePagedList<T>(
   fetcher: (page: PageQuery) => Promise<ListResponse<T>>,
   onError: (error: unknown) => void,
   initialLimit = DEFAULT_PAGE_SIZE,
+  enabled = true,
 ): PagedList<T> {
   const isMobile = useIsMobile()
   const [items, setItems] = useState<T[]>([])
@@ -50,6 +55,7 @@ export function usePagedList<T>(
   const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     setLoading(true)
     fetcher({ limit, offset })
@@ -66,7 +72,7 @@ export function usePagedList<T>(
     return () => {
       cancelled = true
     }
-  }, [limit, offset, reloadToken, isMobile])
+  }, [limit, offset, reloadToken, isMobile, enabled])
 
   const setLimit = useCallback((next: number) => {
     setLimitState(next)

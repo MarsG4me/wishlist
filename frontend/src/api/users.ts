@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { OwnUser, SimpleUser, UserTier } from './types'
+import type { Locale, OwnUser, SimpleUser, UserTier } from './types'
 
 export const getOwnUser = async (): Promise<OwnUser> => (await api.get('/v1/users/me')).data
 
@@ -9,6 +9,10 @@ export const updateDisplayname = async (displayname: string): Promise<OwnUser> =
 /** Backend applies the change in Keycloak first; refresh the token afterwards. */
 export const updateEmail = async (email: string): Promise<OwnUser> =>
   (await api.patch('/v1/users/me/email', { email })).data
+
+/** Interface language; the backend stores it and mirrors it into Keycloak. */
+export const updateLocale = async (locale: Locale): Promise<OwnUser> =>
+  (await api.patch('/v1/users/me/locale', { locale })).data
 
 /** In-app password change; backend verifies the current password against Keycloak. */
 export const updatePassword = async (currentPassword: string, newPassword: string): Promise<void> => {

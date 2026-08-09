@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { keycloak } from './keycloak'
 import { getOwnUser } from '../api/users'
 import type { OwnUser } from '../api/types'
+import { setLanguage } from '../i18n'
 
 interface AuthContextValue {
   user: OwnUser | null
@@ -24,14 +25,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .init({ onLoad: 'login-required', pkceMethod: 'S256', checkLoginIframe: false })
       .then(async (authenticated) => {
         if (authenticated) {
-          setUser(await getOwnUser())
+          await loadUser()
           setReady(true)
         }
       })
       .catch((err) => console.error('Keycloak init failed', err))
   }, [])
 
-  const refreshUser = async () => setUser(await getOwnUser())
+  /** The account locale drives the UI language, so it is applied with every load. */
+  const loadUser = async () => {
+    const loaded = await getOwnUser()
+    setLanguage(loaded.locale)
+    setUser(loaded)
+  }
+
+  const refreshUser = loadUser
   const logout = () => keycloak.logout({ redirectUri: window.location.origin })
 
   if (!ready) return <div className="app-loading">…</div>

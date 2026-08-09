@@ -1,5 +1,8 @@
 export type UserTier = 'FREE' | 'PREMIUM'
 
+/** Interface language of an account; matches the backend enum `user_locale`. */
+export type Locale = 'DE' | 'EN'
+
 /** Envelope of every list endpoint. */
 export interface ListResponse<T> {
   total: number
@@ -19,6 +22,7 @@ export interface OwnUser {
   displayname: string
   email: string
   tier: UserTier
+  locale: Locale
   /** Set for Google/Apple logins: credentials are managed by that provider, not here. */
   identity_provider: string | null
 }
@@ -54,6 +58,12 @@ export interface WishClaim {
   participants: SimpleUser[]
   /** Whether the requester is part of this claim (backend-decided). */
   is_participant: boolean
+  /** Whether the requester created it and may therefore open or close it. */
+  is_owner: boolean
+  /** Whether the creator opened the claim for co-claimers. */
+  is_shared: boolean
+  /** Whether the requester may join right now (backend-decided). */
+  can_join: boolean
 }
 
 /** Group-member view: includes claim state. */
@@ -110,4 +120,6 @@ export interface MyClaim {
   wishlist_name: string
   wishlist_owner: SimpleUser
   participants: SimpleUser[]
+  is_owner: boolean
+  is_shared: boolean
 }

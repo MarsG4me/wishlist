@@ -15,6 +15,10 @@ export const listWishes = async (
 ): Promise<ListResponse<OwnWish | SharedWish>> =>
   (await api.get('/v1/wishes', { params: { wishlist_id: wishlistId, ...page } })).data
 
+/** Owner gets an OwnWish, group members a SharedWish — the backend decides. */
+export const getWish = async (id: string): Promise<OwnWish | SharedWish> =>
+  (await api.get(`/v1/wishes/${id}`)).data
+
 export const createWish = async (wishlistId: string, input: WishInput): Promise<OwnWish> =>
   (await api.post('/v1/wishes', { wishlist_id: wishlistId, ...input })).data
 

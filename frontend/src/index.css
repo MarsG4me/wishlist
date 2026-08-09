@@ -50,6 +50,54 @@ body {
   gap: 1rem;
 }
 
+/*
+ * An entity card IS the link to its entity: the title anchor is stretched over the whole
+ * card, so clicking anywhere opens it. Everything interactive inside (external wish
+ * links, claim buttons, the actions menu) is lifted above that overlay.
+ */
+.entity-card {
+  position: relative;
+}
+
+.entity-card .p-card-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.entity-card .p-card-title a:hover {
+  text-decoration: underline;
+}
+
+.entity-card .p-card-title a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.menu-item-danger .p-menuitem-text,
+.menu-item-danger .p-menuitem-icon {
+  color: var(--red-500, #e24c4c);
+}
+
+.entity-card-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1;
+}
+
+.entity-card .wish-card-links,
+.entity-card .claim-row {
+  position: relative;
+  z-index: 1;
+}
+
+/* keep the title clear of the actions button */
+.entity-card .p-card-title {
+  padding-right: 2.5rem;
+}
+
 .wish-card-links {
   display: flex;
   flex-wrap: wrap;

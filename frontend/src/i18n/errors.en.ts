@@ -34,6 +34,8 @@ export const errorsEn: Record<string, string> = {
   CANNOT_CLAIM_OWN_WISH: 'You cannot claim your own wish.',
   ALREADY_CLAIMED: 'You already participate in a claim for this wish.',
   WISH_FULLY_CLAIMED: 'All units of this wish are already claimed.',
+  CLAIM_NOT_SHARED: 'This claim is not open for others; only the person who made it can open it up.',
+  NOT_CLAIM_OWNER: 'Only the person who made this claim can change it.',
   INVALID_CREDENTIALS: 'The current password is incorrect.',
   KEYCLOAK_UPDATE_FAILED: 'The account update was rejected. Please try again.',
   INTERNAL_ERROR: 'Something went wrong. Please try again later.',

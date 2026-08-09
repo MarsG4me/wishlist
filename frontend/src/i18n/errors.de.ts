@@ -34,6 +34,9 @@ export const errorsDe: Record<string, string> = {
   CANNOT_CLAIM_OWN_WISH: 'Du kannst deinen eigenen Wunsch nicht übernehmen.',
   ALREADY_CLAIMED: 'Du beteiligst dich bereits an einer Übernahme dieses Wunsches.',
   WISH_FULLY_CLAIMED: 'Alle Exemplare dieses Wunsches sind bereits übernommen.',
+  CLAIM_NOT_SHARED:
+    'Diese Übernahme ist nicht für andere geöffnet; nur wer sie gemacht hat, kann sie öffnen.',
+  NOT_CLAIM_OWNER: 'Nur wer diese Übernahme gemacht hat, kann sie ändern.',
   INVALID_CREDENTIALS: 'Das aktuelle Passwort ist falsch.',
   KEYCLOAK_UPDATE_FAILED: 'Die Kontoänderung wurde abgelehnt. Bitte versuche es erneut.',
   INTERNAL_ERROR: 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.',
