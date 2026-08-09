@@ -4,6 +4,7 @@ import de.marsg.wishlist.configs.security.AuthenticatedUser;
 import de.marsg.wishlist.endpoints.dto.users.ReturnOwnUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateEmailDTO;
+import de.marsg.wishlist.endpoints.dto.users.UpdatePasswordDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateTierDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateUserDTO;
 import de.marsg.wishlist.endpoints.services.UserService;
@@ -52,6 +53,13 @@ public class UserController {
     public ReturnOwnUserDTO updateEmail(AuthenticatedUser user, @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody UpdateEmailDTO body) {
         return userService.updateEmail(user.userId(), jwt.getTokenValue(), body.email());
+    }
+
+    @PatchMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Change password in-app: current password verified, then reset in Keycloak")
+    public void updatePassword(AuthenticatedUser user, @Valid @RequestBody UpdatePasswordDTO body) {
+        userService.updatePassword(user.userId(), body.currentPassword(), body.newPassword());
     }
 
     @DeleteMapping("/me")

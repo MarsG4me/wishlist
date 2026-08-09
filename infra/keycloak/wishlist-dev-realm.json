@@ -49,9 +49,30 @@
       "directAccessGrantsEnabled": true,
       "redirectUris": [],
       "webOrigins": []
+    },
+    {
+      "clientId": "wishlist-backend",
+      "name": "Wishlist Backend (service account for password resets)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "dev-secret",
+      "protocol": "openid-connect",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [],
+      "webOrigins": []
     }
   ],
   "users": [
+    {
+      "username": "service-account-wishlist-backend",
+      "enabled": true,
+      "serviceAccountClientId": "wishlist-backend",
+      "clientRoles": {
+        "realm-management": ["manage-users"]
+      }
+    },
     {
       "username": "alice@test.local",
       "email": "alice@test.local",

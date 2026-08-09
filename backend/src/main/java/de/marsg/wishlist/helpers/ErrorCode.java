@@ -49,6 +49,7 @@ public enum ErrorCode {
     ALREADY_CLAIMED(HttpStatus.CONFLICT, "You already claim or participate in a claim of this wish"),
     WISH_FULLY_CLAIMED(HttpStatus.CONFLICT, "All units of this wish are already claimed"),
 
+    INVALID_CREDENTIALS(HttpStatus.FORBIDDEN, "The current password is incorrect"),
     KEYCLOAK_UPDATE_FAILED(HttpStatus.BAD_GATEWAY, "The account update was rejected by the identity provider"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
 

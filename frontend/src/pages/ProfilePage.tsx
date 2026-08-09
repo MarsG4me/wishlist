@@ -6,8 +6,9 @@ import { Dropdown } from 'primereact/dropdown'
 import { Tag } from 'primereact/tag'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { useAuth } from '../auth/AuthProvider'
-import { deleteOwnAccount, updateDisplayname, updateEmail } from '../api/users'
-import { openPasswordManagement, updateLocale } from '../api/keycloakAccount'
+import { deleteOwnAccount, updateDisplayname, updateEmail, updatePassword } from '../api/users'
+import { updateLocale } from '../api/keycloakAccount'
+import { Password } from 'primereact/password'
 import { keycloak } from '../auth/keycloak'
 import { currentLanguage } from '../i18n'
 import { useApiToast } from '../hooks/useApiToast'
@@ -18,6 +19,9 @@ export function ProfilePage() {
   const [displayname, setDisplayname] = useState(user?.displayname ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [language, setLanguage] = useState(currentLanguage())
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [repeatPassword, setRepeatPassword] = useState('')
 
   const saveDisplayname = async () => {
     try {
@@ -36,6 +40,18 @@ export function ProfilePage() {
       await keycloak.updateToken(-1).catch(() => keycloak.login())
       await refreshUser()
       showSuccess('Email updated')
+    } catch (e) {
+      showError(e)
+    }
+  }
+
+  const savePassword = async () => {
+    try {
+      await updatePassword(currentPassword, newPassword)
+      setCurrentPassword('')
+      setNewPassword('')
+      setRepeatPassword('')
+      showSuccess('Password changed')
     } catch (e) {
       showError(e)
     }
@@ -108,7 +124,42 @@ export function ProfilePage() {
             onChange={(e) => saveLanguage(e.value)}
           />
         </div>
-        <Button label="Change password" icon="pi pi-key" outlined onClick={openPasswordManagement} />
+        <div className="form-field" style={{ maxWidth: 420 }}>
+          <label>Change password</label>
+          <Password
+            value={currentPassword}
+            placeholder="Current password"
+            feedback={false}
+            toggleMask
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+          <Password
+            value={newPassword}
+            placeholder="New password (min. 8 characters)"
+            toggleMask
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <Password
+            value={repeatPassword}
+            placeholder="Repeat new password"
+            feedback={false}
+            toggleMask
+            onChange={(e) => setRepeatPassword(e.target.value)}
+          />
+          {repeatPassword !== '' && newPassword !== repeatPassword && (
+            <small className="muted">Passwords do not match.</small>
+          )}
+          <div>
+            <Button
+              label="Change password"
+              icon="pi pi-key"
+              disabled={
+                !currentPassword || newPassword.length < 8 || newPassword !== repeatPassword
+              }
+              onClick={savePassword}
+            />
+          </div>
+        </div>
       </Card>
       <br />
 

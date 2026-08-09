@@ -52,6 +52,12 @@ public class UserService {
         return ReturnOwnUserDTO.from(user);
     }
 
+    /** Verifies the current password, then resets via Keycloak Admin API. Nothing stored in our DB. */
+    public void updatePassword(UUID userId, String currentPassword, String newPassword) {
+        UserEntity user = requireUser(userId);
+        keycloakAccountClient.changePassword(user.getEmail(), currentPassword, user.getKeycloakId(), newPassword);
+    }
+
     @Transactional
     public void softDeleteOwnUser(UUID userId) {
         UserEntity user = requireUser(userId);

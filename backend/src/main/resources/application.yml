@@ -41,4 +41,10 @@ wishlist:
   purge:
     enabled: ${PURGE_ENABLED:false}
   keycloak:
-    account-url: ${KEYCLOAK_ACCOUNT_URL:http://localhost:8180/realms/wishlist-dev/account}
+    base-url: ${KEYCLOAK_BASE_URL:http://localhost:8180}
+    realm: ${KEYCLOAK_REALM:wishlist-dev}
+    # confidential client with service-account role realm-management/manage-users (password resets)
+    admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:wishlist-backend}
+    admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:dev-secret}
+    # public client with direct access grants (current-password verification)
+    verify-client-id: ${KEYCLOAK_VERIFY_CLIENT_ID:wishlist-cli}

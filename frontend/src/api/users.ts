@@ -10,6 +10,14 @@ export const updateDisplayname = async (displayname: string): Promise<OwnUser> =
 export const updateEmail = async (email: string): Promise<OwnUser> =>
   (await api.patch('/v1/users/me/email', { email })).data
 
+/** In-app password change; backend verifies the current password against Keycloak. */
+export const updatePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+  await api.patch('/v1/users/me/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+}
+
 export const deleteOwnAccount = async (): Promise<void> => {
   await api.delete('/v1/users/me')
 }
