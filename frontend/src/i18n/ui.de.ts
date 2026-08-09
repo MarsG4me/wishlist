@@ -17,6 +17,7 @@ export const uiDe: UiCatalogue = {
   'common.change': 'Ändern',
   'common.search': 'Suchen',
   'common.leave': 'Verlassen',
+  'common.remove': 'Entfernen',
   'common.name': 'Name',
   'common.description': 'Beschreibung',
   'common.email': 'E-Mail',

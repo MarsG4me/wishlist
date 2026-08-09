@@ -87,7 +87,7 @@ export function MyClaimsPage() {
           header=""
           body={(claim: MyClaim) => (
             <Button
-              label={t('common.leave')}
+              label={t('common.remove')}
               icon="pi pi-times"
               text
               severity="danger"

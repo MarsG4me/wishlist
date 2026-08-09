@@ -19,6 +19,7 @@ export const uiEn = {
   'common.change': 'Change',
   'common.search': 'Search',
   'common.leave': 'Leave',
+  'common.remove': 'Remove',
   'common.name': 'Name',
   'common.description': 'Description',
   'common.email': 'Email',
