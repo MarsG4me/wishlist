@@ -1,0 +1,109 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family, system-ui, sans-serif);
+  background: var(--surface-ground, #f8f9fa);
+}
+
+.app-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.app-loading {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  font-size: 2rem;
+}
+
+.shell-end {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.premium-badge {
+  background: gold;
+  color: #333;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.wish-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.claim-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.muted {
+  color: var(--text-color-secondary, #6c757d);
+  font-size: 0.875rem;
+}
+
+.link-editor-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.link-editor-row .p-inputtext {
+  flex: 1;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.invite-code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.invite-code-box code {
+  font-size: 1.1rem;
+  background: var(--surface-100, #eee);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.ad-slot {
+  /* renders nothing while ads are disabled; reserved layout hook for later */
+  display: none;
+}
