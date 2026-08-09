@@ -1,0 +1,96 @@
+{
+  "realm": "wishlist-dev",
+  "enabled": true,
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["de", "en"],
+  "defaultLocale": "en",
+  "sslRequired": "external",
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Regular application user"
+      },
+      {
+        "name": "admin",
+        "description": "Application administrator (tier management)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "wishlist-frontend",
+      "name": "Wishlist Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      }
+    },
+    {
+      "clientId": "wishlist-cli",
+      "name": "Wishlist CLI (dev tokens)",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ],
+  "users": [
+    {
+      "username": "alice@test.local",
+      "email": "alice@test.local",
+      "firstName": "Alice",
+      "lastName": "Anderson",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "test", "temporary": false }],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "bob@test.local",
+      "email": "bob@test.local",
+      "firstName": "Bob",
+      "lastName": "Baker",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "test", "temporary": false }],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "carol@test.local",
+      "email": "carol@test.local",
+      "firstName": "Carol",
+      "lastName": "Clark",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "test", "temporary": false }],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "admin@test.local",
+      "email": "admin@test.local",
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "test", "temporary": false }],
+      "realmRoles": ["user", "admin"]
+    }
+  ]
+}

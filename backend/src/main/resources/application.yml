@@ -1,0 +1,44 @@
+server:
+  port: ${SERVER_PORT:6543}
+
+spring:
+  application:
+    name: wishlist-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/wishlist}
+    username: ${DB_USER:wishlist}
+    password: ${DB_PASSWORD:wishlist}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/wishlist-dev}
+
+springdoc:
+  api-docs:
+    path: /docs/api-docs
+  swagger-ui:
+    path: /docs/api-ui.html
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      path-mapping:
+        health: health
+      exposure:
+        include: health
+
+wishlist:
+  cors:
+    allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  purge:
+    enabled: ${PURGE_ENABLED:false}
+  keycloak:
+    account-url: ${KEYCLOAK_ACCOUNT_URL:http://localhost:8180/realms/wishlist-dev/account}
