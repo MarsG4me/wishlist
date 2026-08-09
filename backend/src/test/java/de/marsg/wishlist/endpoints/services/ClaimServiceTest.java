@@ -108,12 +108,12 @@ class ClaimServiceTest {
 
     @Test
     void capacityFullBlocksNewClaim() {
-        mockWish(2);
+        mockWish(1);
         WishlistEntity wishlist = mockWishlist(ownerId);
         when(wishlist.getId()).thenReturn(wishlistId);
         when(accessService.canViewAsSharedWishlist(requester, wishlistId)).thenReturn(true);
         when(participantRepository.existsByWishesIdAndIdUsersId(wishId, requester)).thenReturn(false);
-        when(claimRepository.countByWishesId(wishId)).thenReturn(2L);
+        when(claimRepository.countByWishesId(wishId)).thenReturn(1L);
         assertThatThrownBy(() -> claimService.create(requester, wishId))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.WISH_FULLY_CLAIMED));

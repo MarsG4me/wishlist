@@ -136,9 +136,7 @@ export function WishlistDetailPage() {
             {wish.description && <p>{wish.description}</p>}
             <Tag
               value={
-                wish.quantity === null
-                  ? t('common.unlimited')
-                  : t('wishes.quantity', { count: wish.quantity })
+                wish.quantity === null ? t('common.unlimited') : t('wishes.once')
               }
             />
             <div className="wish-card-links">

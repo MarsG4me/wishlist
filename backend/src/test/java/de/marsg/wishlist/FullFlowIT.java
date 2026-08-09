@@ -88,6 +88,7 @@ class FullFlowIT {
     private String bobId;
     private String wishlistId;
     private String wishId;
+    private String unlimitedWishId;
     private String groupId;
     private String inviteId;
     private String inviteCode;
@@ -335,12 +336,19 @@ class FullFlowIT {
     void wishCrudWithLinks() throws Exception {
         String body = perform(json(post("/v1/wishes").with(alice()),
                 "{\"wishlist_id\":\"" + wishlistId + "\",\"name\":\"Lego\",\"description\":\"big\","
-                        + "\"quantity\":2,\"links\":[{\"url\":\"https://example.com\",\"label\":\"shop\"}]}"), 201);
+                        + "\"quantity\":1,\"links\":[{\"url\":\"https://example.com\",\"label\":\"shop\"}]}"), 201);
         wishId = JsonPath.read(body, "$.id");
         assertThat((List<?>) JsonPath.read(body, "$.links")).hasSize(1);
         mvc.perform(get("/v1/wishes/" + wishId).with(alice()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.claims").doesNotExist()); // owner view is claim-free by type
+        // a wish is giftable once or unlimited — unit counts are not a thing
+        mvc.perform(json(post("/v1/wishes").with(alice()),
+                        "{\"wishlist_id\":\"" + wishlistId + "\",\"name\":\"Bricks\",\"quantity\":2,\"links\":[]}"))
+                .andExpect(status().isBadRequest());
+        unlimitedWishId = JsonPath.read(perform(json(post("/v1/wishes").with(alice()),
+                "{\"wishlist_id\":\"" + wishlistId + "\",\"name\":\"Books\",\"quantity\":null,\"links\":[]}"), 201),
+                "$.id");
     }
 
     // ---------- groups, invites, memberships, shares ----------
@@ -467,15 +475,16 @@ class FullFlowIT {
         mvc.perform(json(post("/v1/claims").with(carol()), "{\"wish_id\":\"" + wishId + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error_code").value("ALREADY_CLAIMED"));
-        // dave takes unit 2/2
-        daveClaimId = JsonPath.read(perform(json(post("/v1/claims").with(dave()),
-                "{\"wish_id\":\"" + wishId + "\"}"), 201), "$.claim_id");
-        // carol leaves the co-claim and tries her own -> capacity full
+        // carol leaves the co-claim and tries her own -> the single unit is taken by bob
         mvc.perform(delete("/v1/claims/" + bobClaimId + "/participants/me").with(carol()))
                 .andExpect(status().isNoContent());
         mvc.perform(json(post("/v1/claims").with(carol()), "{\"wish_id\":\"" + wishId + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error_code").value("WISH_FULLY_CLAIMED"));
+        // the unlimited wish takes any number of independent claims
+        daveClaimId = JsonPath.read(perform(json(post("/v1/claims").with(dave()),
+                "{\"wish_id\":\"" + unlimitedWishId + "\"}"), 201), "$.claim_id");
+        perform(json(post("/v1/claims").with(carol()), "{\"wish_id\":\"" + unlimitedWishId + "\"}"), 201);
     }
 
     @Test
@@ -485,11 +494,15 @@ class FullFlowIT {
         assertThat(ownerView).doesNotContain("claim", "participants", "remaining");
         String sharedView = perform(get("/v1/wishes").param("wishlist_id", wishlistId).with(bob()), 200);
         assertThat((Integer) JsonPath.read(sharedView, "$.items[0].remaining")).isZero();
-        assertThat((List<?>) JsonPath.read(sharedView, "$.items[0].claims")).hasSize(2);
+        assertThat((List<?>) JsonPath.read(sharedView, "$.items[0].claims")).hasSize(1);
         // participation and claimability are answered by the backend, not derived by clients
         assertThat((Boolean) JsonPath.read(sharedView, "$.items[0].can_claim")).isFalse();
         List<Boolean> bobParticipation = JsonPath.read(sharedView, "$.items[0].claims[*].is_participant");
-        assertThat(bobParticipation).containsExactlyInAnyOrder(true, false);
+        assertThat(bobParticipation).containsExactly(true);
+        // unlimited wish: no remaining count, and bob may still claim next to dave and carol
+        assertThat((Integer) JsonPath.read(sharedView, "$.items[1].remaining")).isNull();
+        assertThat((List<?>) JsonPath.read(sharedView, "$.items[1].claims")).hasSize(2);
+        assertThat((Boolean) JsonPath.read(sharedView, "$.items[1].can_claim")).isTrue();
         // my-claims overview
         mvc.perform(get("/v1/claims").with(bob()))
                 .andExpect(status().isOk())
@@ -499,10 +512,15 @@ class FullFlowIT {
     @Test
     @Order(42)
     void quantityReductionGrandfathersClaims() throws Exception {
-        mvc.perform(json(patch("/v1/wishes/" + wishId).with(alice()),
-                        "{\"name\":\"Lego\",\"quantity\":1,\"links\":[]}"))
+        // unlimited -> once while two claims exist: both stay valid, the owner is warned
+        mvc.perform(json(patch("/v1/wishes/" + unlimitedWishId).with(alice()),
+                        "{\"name\":\"Books\",\"quantity\":1,\"links\":[]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.existing_claims_affected").value(true));
+        // counts stay rejected on update too
+        mvc.perform(json(patch("/v1/wishes/" + unlimitedWishId).with(alice()),
+                        "{\"name\":\"Books\",\"quantity\":3,\"links\":[]}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

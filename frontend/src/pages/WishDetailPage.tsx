@@ -119,7 +119,7 @@ export function WishDetailPage() {
               ? t('common.unlimited')
               : isShared(wish)
                 ? t('wishes.remaining', { remaining: wish.remaining ?? 0, quantity: wish.quantity })
-                : t('wishes.quantity', { count: wish.quantity })
+                : t('wishes.once')
           }
           severity={isShared(wish) && wish.remaining === 0 ? 'warning' : undefined}
         />

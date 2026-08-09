@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { InputNumber } from 'primereact/inputnumber'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
 import type { OwnWish, WishLink } from '../api/types'
@@ -19,8 +18,8 @@ interface Props {
 export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  // a wish is giftable once or unlimited — pooling for one gift is done via open claims
   const [unlimited, setUnlimited] = useState(false)
-  const [quantity, setQuantity] = useState<number>(1)
   const [links, setLinks] = useState<WishLink[]>([])
   const [saving, setSaving] = useState(false)
   const t = useT()
@@ -30,7 +29,6 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
     setName(wish?.name ?? '')
     setDescription(wish?.description ?? '')
     setUnlimited(wish ? wish.quantity === null : false)
-    setQuantity(wish?.quantity ?? 1)
     setLinks(wish?.links ?? [])
   }, [visible, wish])
 
@@ -43,7 +41,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
       await onSave({
         name,
         description: description || null,
-        quantity: unlimited ? null : quantity,
+        quantity: unlimited ? null : 1,
         links: links.filter((link) => link.url.trim() !== ''),
       })
       onHide()
@@ -78,14 +76,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
           <Checkbox checked={unlimited} onChange={(e) => setUnlimited(!!e.checked)} />{' '}
           {t('wishes.giftableUnlimited')}
         </label>
-        {!unlimited && (
-          <InputNumber
-            value={quantity}
-            min={1}
-            showButtons
-            onValueChange={(e) => setQuantity(e.value ?? 1)}
-          />
-        )}
+        <small className="muted">{t('wishes.quantityHint')}</small>
       </div>
       <div className="form-field">
         <label>{t('wishes.links')}</label>

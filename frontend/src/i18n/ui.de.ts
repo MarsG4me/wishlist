@@ -50,9 +50,11 @@ export const uiDe: UiCatalogue = {
   'wishes.existingClaimsHeader': 'Bestehende Übernahmen',
   'wishes.existingClaimsMessage':
     'Dieser Wunsch wurde bereits übernommen. Die Übernahmen bleiben gültig, und die Übernehmenden werden NICHT über deine Änderung informiert.',
-  'wishes.quantity': '{count}×',
   'wishes.remaining': '{remaining} von {quantity} übrig',
   'wishes.giftableUnlimited': 'Beliebig oft schenkbar',
+  'wishes.quantityHint':
+    'Aus bedeutet einmal schenkbar. Mehrere können sich trotzdem an einem Geschenk beteiligen.',
+  'wishes.once': 'Einmal',
   'wishes.links': 'Links',
   'wishes.linkLabel': 'Bezeichnung',
   'wishes.addLink': 'Link hinzufügen',

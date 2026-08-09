@@ -57,8 +57,9 @@ public class WishController {
     }
 
     @PatchMapping("/{id}")
-    @Operation(summary = "Update a wish; links are replaced as a set. Lowering quantity below "
-            + "existing claims grandfathers them and sets existing_claims_affected")
+    @Operation(summary = "Update a wish; links are replaced as a set. quantity is null (unlimited) "
+            + "or 1. Switching unlimited -> 1 grandfathers existing claims and sets "
+            + "existing_claims_affected")
     public ReturnUpdatedWishDTO update(AuthenticatedUser user, @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateWishDTO body) {
         return wishService.update(user.userId(), id, body);

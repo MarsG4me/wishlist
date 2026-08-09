@@ -51,9 +51,10 @@ export const uiEn = {
   'wishes.existingClaimsHeader': 'Existing claims',
   'wishes.existingClaimsMessage':
     'This wish already has claims. They stay valid, and the claimers are NOT notified of your change.',
-  'wishes.quantity': '{count}×',
   'wishes.remaining': '{remaining} of {quantity} left',
   'wishes.giftableUnlimited': 'Giftable unlimited times',
+  'wishes.quantityHint': 'Off means giftable once. Several people can still fund one gift together.',
+  'wishes.once': 'Once',
   'wishes.links': 'Links',
   'wishes.linkLabel': 'Label',
   'wishes.addLink': 'Add link',
