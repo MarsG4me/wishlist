@@ -6,11 +6,21 @@ import java.util.UUID;
 /**
  * The provisioned application user behind the current JWT. Injected into controller
  * methods by {@link CurrentUserArgumentResolver}.
+ *
+ * @param identityProvider alias of the external login (Google, Apple, …) the session
+ *                         came from, or {@code null} for a local account. Credentials
+ *                         of federated accounts live at the provider, so we neither
+ *                         change nor store them.
  */
 public record AuthenticatedUser(
         UUID userId,
         UUID keycloakId,
         String displayname,
         UserTier tier,
-        boolean isAdmin) {
+        boolean isAdmin,
+        String identityProvider) {
+
+    public boolean isExternallyManaged() {
+        return identityProvider != null && !identityProvider.isBlank();
+    }
 }

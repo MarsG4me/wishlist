@@ -7,6 +7,7 @@ import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
+import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -21,35 +22,43 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final GroupMembershipRepository membershipRepository;
+    private final GroupWishlistShareRepository shareRepository;
     private final KeycloakAccountClient keycloakAccountClient;
 
     public UserService(UserRepository userRepository, GroupMembershipRepository membershipRepository,
-            KeycloakAccountClient keycloakAccountClient) {
+            GroupWishlistShareRepository shareRepository, KeycloakAccountClient keycloakAccountClient) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
+        this.shareRepository = shareRepository;
         this.keycloakAccountClient = keycloakAccountClient;
     }
 
     @Transactional(readOnly = true)
-    public ReturnOwnUserDTO getOwnUser(UUID userId) {
-        return ReturnOwnUserDTO.from(requireUser(userId));
+    public ReturnOwnUserDTO getOwnUser(UUID userId, String identityProvider) {
+        return ReturnOwnUserDTO.from(requireUser(userId), identityProvider);
     }
 
     @Transactional
-    public ReturnOwnUserDTO updateDisplayname(UUID userId, String displayname) {
+    public ReturnOwnUserDTO updateDisplayname(UUID userId, String identityProvider, String displayname) {
         UserEntity user = requireUser(userId);
         user.setDisplayname(displayname);
-        return ReturnOwnUserDTO.from(user);
+        return ReturnOwnUserDTO.from(user, identityProvider);
     }
 
     /** Keycloak first; the DB copy is only written when Keycloak accepted the change. */
     @Transactional
     public ReturnOwnUserDTO updateEmail(UUID userId, String bearerToken, String newEmail) {
         UserEntity user = requireUser(userId);
+        // checked up front so a taken address fails with a code instead of a constraint violation
+        userRepository.findByEmailIncludingDeleted(newEmail)
+                .filter(existing -> !existing.getId().equals(userId))
+                .ifPresent(existing -> {
+                    throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
+                });
         keycloakAccountClient.updateEmail(bearerToken, newEmail);
         user.setEmail(newEmail);
         log.info("Updated email of user {}", userId);
-        return ReturnOwnUserDTO.from(user);
+        return ReturnOwnUserDTO.from(user, null);
     }
 
     /** Verifies the current password, then resets via Keycloak Admin API. Nothing stored in our DB. */
@@ -62,6 +71,8 @@ public class UserService {
     public void softDeleteOwnUser(UUID userId) {
         UserEntity user = requireUser(userId);
         user.markDeleted();
+        // stop sharing immediately: a deleted account's wishlists disappear from every group
+        shareRepository.deleteAll(shareRepository.findSharesOfUser(userId));
         log.info("Soft-deleted user {}", userId);
     }
 
@@ -83,7 +94,8 @@ public class UserService {
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
         target.setTier(tier);
         log.info("Set tier of user {} to {}", targetId, tier);
-        return ReturnOwnUserDTO.from(target);
+        // admin response: the target's login method is none of the admin's business
+        return ReturnOwnUserDTO.from(target, null);
     }
 
     private UserEntity requireUser(UUID userId) {

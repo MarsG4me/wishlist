@@ -1,9 +1,10 @@
 package de.marsg.wishlist.jpa.repositories;
 
 import de.marsg.wishlist.jpa.entities.GroupInviteEntity;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,7 +14,7 @@ public interface GroupInviteRepository extends JpaRepository<GroupInviteEntity, 
 
     Optional<GroupInviteEntity> findByCode(String code);
 
-    List<GroupInviteEntity> findByGroupsIdOrderByIdDesc(UUID groupsId);
+    Page<GroupInviteEntity> findByGroupsId(UUID groupsId, Pageable pageable);
 
     /**
      * Atomically consumes one use. Returns 0 when the invite is already exhausted,

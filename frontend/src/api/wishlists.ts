@@ -1,7 +1,8 @@
 import { api } from './client'
-import type { Wishlist } from './types'
+import type { ListResponse, PageQuery, Wishlist } from './types'
 
-export const listWishlists = async (): Promise<Wishlist[]> => (await api.get('/v1/wishlists')).data
+export const listWishlists = async (page: PageQuery = {}): Promise<ListResponse<Wishlist>> =>
+  (await api.get('/v1/wishlists', { params: page })).data
 
 export const createWishlist = async (name: string): Promise<Wishlist> =>
   (await api.post('/v1/wishlists', { name })).data

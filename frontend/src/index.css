@@ -103,6 +103,30 @@ body {
   word-break: break-all;
 }
 
+.list-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.list-controls-size {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.list-sentinel {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 3rem;
+}
+
 .stat-number {
   font-size: 2rem;
   font-weight: 700;

@@ -79,6 +79,17 @@ CI (`.github/workflows/ci.yml`) runs all three layers on every push/PR.
 
 ## Conventions
 
+- Every list endpoint answers with the same envelope:
+  `{ "total": <matching rows>, "count": <returned>, "limit": <applied>, "offset": <first index>, "items": [...] }`.
+  `limit` is the requester's choice and gets **clamped** to 1..100 (default 20) instead of rejected.
+  The UI offers 10/20/50/80/100; phones append pages while scrolling, wider screens page explicitly.
+- An email belongs to exactly one account, including while that account is soft-deleted:
+  signing in with a new identity for a taken address returns `EMAIL_ALREADY_EXISTS` telling
+  the user to reactivate instead. Accounts coming from an external provider (Google, Apple)
+  carry `identity_provider` on `/v1/users/me`; email and password changes are refused for them
+  (`ACCOUNT_MANAGED_EXTERNALLY`) because the provider owns those credentials.
+- Leaving a group — or deleting an account — removes that user's shares from the affected groups.
+
 - All endpoints versioned: `/v1/...`
 - All IDs are UUIDv7 (custom Hibernate generator; PG 18 `uuidv7()` as column default).
   No `created_at` columns — creation time is extracted from the id.

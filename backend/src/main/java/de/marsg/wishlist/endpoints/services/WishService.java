@@ -1,5 +1,6 @@
 package de.marsg.wishlist.endpoints.services;
 
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.CreateWishDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.ReturnOwnWishDTO;
@@ -10,6 +11,7 @@ import de.marsg.wishlist.endpoints.dto.wishes.UpdateWishDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.WishLinkDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.ClaimEntity;
 import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.entities.WishEntity;
@@ -25,6 +27,9 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,18 +58,19 @@ public class WishService {
 
     /** Owner gets the claim-free view; group members get the shared view with claims. */
     @Transactional(readOnly = true)
-    public List<?> listByWishlist(UUID userId, UUID wishlistId) {
+    public ReturnListDTO<?> listByWishlist(UUID userId, UUID wishlistId, Integer limit, Integer offset) {
         WishlistEntity wishlist = wishlistService.requireWishlist(wishlistId);
-        List<WishEntity> wishes = wishRepository.findByWishlistsIdOrderByIdAsc(wishlistId);
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.ASC, "id"));
+        Page<WishEntity> wishes = wishRepository.findByWishlistsId(wishlistId, pageable);
         if (accessService.isWishlistOwner(userId, wishlist)) {
-            return wishes.stream().map(ReturnOwnWishDTO::from).toList();
+            return ReturnListDTO.of(wishes, ReturnOwnWishDTO::from);
         }
         accessService.assertCanViewWishlist(userId, wishlist);
         Map<UUID, List<ReturnWishClaimDTO>> claimsByWish =
-                claimsByWish(wishes.stream().map(WishEntity::getId).toList());
-        return wishes.stream()
+                claimsByWish(wishes.getContent().stream().map(WishEntity::getId).toList());
+        return ReturnListDTO.of(wishes, wishes.getContent().stream()
                 .map(w -> ReturnSharedWishDTO.from(w, claimsByWish.getOrDefault(w.getId(), List.of())))
-                .toList();
+                .toList());
     }
 
     @Transactional(readOnly = true)

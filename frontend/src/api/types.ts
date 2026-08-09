@@ -1,10 +1,26 @@
 export type UserTier = 'FREE' | 'PREMIUM'
 
+/** Envelope of every list endpoint. */
+export interface ListResponse<T> {
+  total: number
+  count: number
+  limit: number
+  offset: number
+  items: T[]
+}
+
+export interface PageQuery {
+  limit?: number
+  offset?: number
+}
+
 export interface OwnUser {
   id: string
   displayname: string
   email: string
   tier: UserTier
+  /** Set for Google/Apple logins: credentials are managed by that provider, not here. */
+  identity_provider: string | null
 }
 
 export interface SimpleUser {

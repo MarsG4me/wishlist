@@ -24,7 +24,8 @@ export function AdminPage() {
 
   const search = async () => {
     try {
-      setResults(await searchUsersByEmail(email.trim()))
+      const page = await searchUsersByEmail(email.trim(), { limit: 100 })
+      setResults(page.items)
       setSearched(true)
     } catch (e) {
       showError(e)

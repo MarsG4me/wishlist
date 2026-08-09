@@ -1,15 +1,18 @@
 package de.marsg.wishlist.endpoints.services;
 
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.wishlists.ReturnWishlistDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.entities.WishlistEntity;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
-import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,10 +33,10 @@ public class WishlistService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReturnWishlistDTO> listOwn(UUID userId) {
-        return wishlistRepository.findByUsersIdOrderByIdDesc(userId).stream()
-                .map(ReturnWishlistDTO::from)
-                .toList();
+    public ReturnListDTO<ReturnWishlistDTO> listOwn(UUID userId, Integer limit, Integer offset) {
+        // newest first: UUIDv7 ids sort by creation time
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
+        return ReturnListDTO.of(wishlistRepository.findByUsersId(userId, pageable), ReturnWishlistDTO::from);
     }
 
     @Transactional

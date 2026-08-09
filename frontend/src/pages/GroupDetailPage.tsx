@@ -31,6 +31,9 @@ import { useApiToast } from '../hooks/useApiToast'
 import { MemberTable } from '../components/MemberTable'
 import { InviteDialog } from '../components/InviteDialog'
 
+/** Group sub-lists stay small (members, shares, invites) — one maximum-size page covers them. */
+const FULL_PAGE = { limit: 100, offset: 0 }
+
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -61,14 +64,14 @@ export function GroupDetailPage() {
         setEditDescription(g.description ?? '')
       })
       .catch(showError)
-    listShares(id).then(setShares).catch(showError)
-    listMembers(id).then(setMembers).catch(showError)
-    listWishlists().then(setOwnLists).catch(showError)
+    listShares(id, FULL_PAGE).then((page) => setShares(page.items)).catch(showError)
+    listMembers(id, FULL_PAGE).then((page) => setMembers(page.items)).catch(showError)
+    listWishlists(FULL_PAGE).then((page) => setOwnLists(page.items)).catch(showError)
   }
   useEffect(reload, [id])
 
   useEffect(() => {
-    if (id && canManage) listInvites(id).then(setInvites).catch(showError)
+    if (id && canManage) listInvites(id, FULL_PAGE).then((page) => setInvites(page.items)).catch(showError)
   }, [id, canManage])
 
   if (!id || !group) return <p className="muted">…</p>
@@ -252,7 +255,7 @@ export function GroupDetailPage() {
                         onClick={async () => {
                           try {
                             await revokeInvite(id, invite.id)
-                            listInvites(id).then(setInvites).catch(showError)
+                            listInvites(id, FULL_PAGE).then((page) => setInvites(page.items)).catch(showError)
                           } catch (e) {
                             showError(e)
                           }

@@ -3,12 +3,12 @@ package de.marsg.wishlist.endpoints.controller;
 import de.marsg.wishlist.configs.security.AuthenticatedUser;
 import de.marsg.wishlist.endpoints.dto.claims.CreateClaimDTO;
 import de.marsg.wishlist.endpoints.dto.claims.ReturnMyClaimDTO;
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.ReturnWishClaimDTO;
 import de.marsg.wishlist.endpoints.services.ClaimService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,9 +33,12 @@ public class ClaimController {
     }
 
     @GetMapping
-    @Operation(summary = "Own claim participations with wish/wishlist context")
-    public List<ReturnMyClaimDTO> listMine(AuthenticatedUser user) {
-        return claimService.listMine(user.userId());
+    @Operation(summary = "Own claim participations with wish/wishlist context "
+            + "(limit is clamped to 1..100)")
+    public ReturnListDTO<ReturnMyClaimDTO> listMine(AuthenticatedUser user,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "offset", required = false) Integer offset) {
+        return claimService.listMine(user.userId(), limit, offset);
     }
 
     @PostMapping

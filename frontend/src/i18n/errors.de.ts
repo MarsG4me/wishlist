@@ -5,6 +5,10 @@ export const errorsDe: Record<string, string> = {
   FORBIDDEN: 'Das darfst du nicht.',
   ROUTE_NOT_FOUND: 'Diese Aktion ist unbekannt.',
   USER_NOT_FOUND: 'Nutzer nicht gefunden.',
+  EMAIL_ALREADY_EXISTS:
+    'Ein Konto mit dieser E-Mail existiert bereits. Falls du es gelöscht hast, melde dich mit dem ursprünglichen Login an, um es zu reaktivieren.',
+  ACCOUNT_MANAGED_EXTERNALLY:
+    'Du meldest dich über einen externen Anbieter an — ändere E-Mail und Passwort dort.',
   USER_HAS_NO_COMMON_GROUP: 'Du hast keine gemeinsame Gruppe mit diesem Nutzer.',
   WISHLIST_NOT_FOUND: 'Wunschliste nicht gefunden.',
   NOT_WISHLIST_OWNER: 'Das kann nur der Besitzer der Wunschliste.',

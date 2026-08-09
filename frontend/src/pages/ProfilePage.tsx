@@ -100,6 +100,14 @@ export function ProfilePage() {
       </Card>
       <br />
 
+      {user?.identity_provider ? (
+        <Card title="Account" subTitle={`You sign in with ${user.identity_provider}`}>
+          <p className="muted">
+            Email and password belong to your {user.identity_provider} account — change them
+            there. This app only stores your display name.
+          </p>
+        </Card>
+      ) : (
       <Card title="Account" subTitle="Email is your login name; changes go through Keycloak">
         <div className="form-field" style={{ maxWidth: 420 }}>
           <label htmlFor="profile-email">Email</label>
@@ -161,6 +169,7 @@ export function ProfilePage() {
           </div>
         </div>
       </Card>
+      )}
       <br />
 
       <Card title="Danger zone">

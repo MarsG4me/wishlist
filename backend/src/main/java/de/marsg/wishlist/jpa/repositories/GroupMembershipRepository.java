@@ -4,6 +4,8 @@ import de.marsg.wishlist.jpa.entities.GroupMembershipEntity;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +17,8 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
     boolean existsByGroupsIdAndUsersId(UUID groupsId, UUID usersId);
 
     List<GroupMembershipEntity> findByGroupsId(UUID groupsId);
+
+    Page<GroupMembershipEntity> findByGroupsId(UUID groupsId, Pageable pageable);
 
     long countByGroupsIdAndIsAdminTrue(UUID groupsId);
 

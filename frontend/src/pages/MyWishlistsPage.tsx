@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Button } from 'primereact/button'
 import { Card } from 'primereact/card'
 import { Dialog } from 'primereact/dialog'
@@ -6,21 +6,20 @@ import { InputText } from 'primereact/inputtext'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { useNavigate } from 'react-router-dom'
 import { createWishlist, deleteWishlist, listWishlists, renameWishlist } from '../api/wishlists'
-import type { Wishlist } from '../api/types'
+import type { PageQuery, Wishlist } from '../api/types'
 import { useApiToast } from '../hooks/useApiToast'
+import { usePagedList } from '../hooks/usePagedList'
+import { ListControls } from '../components/ListControls'
 
 export function MyWishlistsPage() {
-  const [wishlists, setWishlists] = useState<Wishlist[]>([])
   const [editing, setEditing] = useState<Wishlist | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
   const navigate = useNavigate()
   const { showError, showSuccess } = useApiToast()
 
-  const reload = () => listWishlists().then(setWishlists).catch(showError)
-  useEffect(() => {
-    reload()
-  }, [])
+  const fetcher = useCallback((page: PageQuery) => listWishlists(page), [])
+  const list = usePagedList<Wishlist>(fetcher, showError)
 
   const openCreate = () => {
     setEditing(null)
@@ -39,7 +38,7 @@ export function MyWishlistsPage() {
       else await createWishlist(name)
       setDialogOpen(false)
       showSuccess('Saved')
-      reload()
+      list.reload()
     } catch (e) {
       showError(e)
     }
@@ -54,7 +53,7 @@ export function MyWishlistsPage() {
       accept: async () => {
         try {
           await deleteWishlist(wishlist.id)
-          reload()
+          list.reload()
         } catch (e) {
           showError(e)
         }
@@ -69,7 +68,7 @@ export function MyWishlistsPage() {
         <Button label="New wishlist" icon="pi pi-plus" onClick={openCreate} />
       </div>
       <div className="card-grid">
-        {wishlists.map((wishlist) => (
+        {list.items.map((wishlist) => (
           <Card key={wishlist.id} title={wishlist.name}>
             <div className="claim-row">
               <Button label="Open" icon="pi pi-arrow-right" text onClick={() => navigate(`/wishlists/${wishlist.id}`)} />
@@ -78,8 +77,21 @@ export function MyWishlistsPage() {
             </div>
           </Card>
         ))}
-        {wishlists.length === 0 && <p className="muted">No wishlists yet — create your first one.</p>}
+        {list.total === 0 && !list.loading && (
+          <p className="muted">No wishlists yet — create your first one.</p>
+        )}
       </div>
+      <ListControls
+        total={list.total}
+        limit={list.limit}
+        offset={list.offset}
+        loading={list.loading}
+        isMobile={list.isMobile}
+        hasMore={list.hasMore}
+        onLimit={list.setLimit}
+        onOffset={list.setOffset}
+        onLoadMore={list.loadMore}
+      />
       <Dialog
         header={editing ? 'Rename wishlist' : 'New wishlist'}
         visible={dialogOpen}

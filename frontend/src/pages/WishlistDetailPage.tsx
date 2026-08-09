@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Button } from 'primereact/button'
 import { Card } from 'primereact/card'
@@ -6,9 +6,11 @@ import { Tag } from 'primereact/tag'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { getWishlist } from '../api/wishlists'
 import { createWish, deleteWish, listWishes, updateWish, type WishInput } from '../api/wishes'
-import type { OwnWish, Wishlist } from '../api/types'
+import type { ListResponse, OwnWish, PageQuery, Wishlist } from '../api/types'
 import { WishFormDialog } from '../components/WishFormDialog'
+import { ListControls } from '../components/ListControls'
 import { useApiToast } from '../hooks/useApiToast'
+import { usePagedList } from '../hooks/usePagedList'
 import { ApiError } from '../api/errors'
 import { tError } from '../i18n'
 
@@ -16,19 +18,25 @@ import { tError } from '../i18n'
 export function WishlistDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [wishlist, setWishlist] = useState<Wishlist | null>(null)
-  const [wishes, setWishes] = useState<OwnWish[]>([])
   const [editing, setEditing] = useState<OwnWish | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const { showError, showSuccess } = useApiToast()
 
+  const fetcher = useCallback((page: PageQuery) => listWishes(id!, page), [id])
+  const list = usePagedList<OwnWish>(
+    fetcher as (page: PageQuery) => Promise<ListResponse<OwnWish>>,
+    showError,
+  )
+  const wishes = list.items
+
   const reload = () => {
     if (!id) return
     getWishlist(id).then(setWishlist).catch(showError)
-    listWishes(id)
-      .then((list) => setWishes(list as OwnWish[]))
-      .catch(showError)
+    list.reload()
   }
-  useEffect(reload, [id])
+  useEffect(() => {
+    if (id) getWishlist(id).then(setWishlist).catch(showError)
+  }, [id])
 
   const save = async (input: WishInput) => {
     try {
@@ -123,8 +131,19 @@ export function WishlistDetailPage() {
             </div>
           </Card>
         ))}
-        {wishes.length === 0 && <p className="muted">No wishes yet.</p>}
+        {list.total === 0 && !list.loading && <p className="muted">No wishes yet.</p>}
       </div>
+      <ListControls
+        total={list.total}
+        limit={list.limit}
+        offset={list.offset}
+        loading={list.loading}
+        isMobile={list.isMobile}
+        hasMore={list.hasMore}
+        onLimit={list.setLimit}
+        onOffset={list.setOffset}
+        onLoadMore={list.loadMore}
+      />
       <WishFormDialog
         visible={dialogOpen}
         wish={editing}

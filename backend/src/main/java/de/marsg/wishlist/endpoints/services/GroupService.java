@@ -1,11 +1,13 @@
 package de.marsg.wishlist.endpoints.services;
 
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.groups.CreateUpdateGroupDTO;
 import de.marsg.wishlist.endpoints.dto.groups.ReturnGroupDTO;
 import de.marsg.wishlist.endpoints.dto.groups.ReturnSharedWishlistDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.GroupEntity;
 import de.marsg.wishlist.jpa.entities.GroupMembershipEntity;
 import de.marsg.wishlist.jpa.entities.GroupWishlistShareEntity;
@@ -19,11 +21,15 @@ import de.marsg.wishlist.jpa.repositories.UserRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,10 +59,9 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReturnGroupDTO> listOwn(UUID userId) {
-        return groupRepository.findGroupsOfUser(userId).stream()
-                .map(ReturnGroupDTO::from)
-                .toList();
+    public ReturnListDTO<ReturnGroupDTO> listOwn(UUID userId, Integer limit, Integer offset) {
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
+        return ReturnListDTO.of(groupRepository.findGroupsOfUser(userId, pageable), ReturnGroupDTO::from);
     }
 
     @Transactional
@@ -93,10 +98,13 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReturnSharedWishlistDTO> listShares(UUID userId, UUID groupId) {
+    public ReturnListDTO<ReturnSharedWishlistDTO> listShares(UUID userId, UUID groupId, Integer limit,
+            Integer offset) {
         GroupEntity group = requireGroup(groupId);
         accessService.assertGroupMember(userId, group);
-        List<GroupWishlistShareEntity> shares = shareRepository.findByGroupsId(groupId);
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
+        Page<GroupWishlistShareEntity> page = shareRepository.findByGroupsId(groupId, pageable);
+        List<GroupWishlistShareEntity> shares = page.getContent();
         List<WishlistEntity> wishlists = wishlistRepository.findAllById(
                 shares.stream().map(GroupWishlistShareEntity::getWishlistsId).toList());
         Map<UUID, ReturnSimpleUserDTO> owners = userRepository.findAllById(
@@ -105,13 +113,13 @@ public class GroupService {
                 .collect(Collectors.toMap(UserEntity::getId, ReturnSimpleUserDTO::from));
         Map<UUID, WishlistEntity> byId = wishlists.stream()
                 .collect(Collectors.toMap(WishlistEntity::getId, Function.identity()));
-        return shares.stream()
+        return ReturnListDTO.of(page, shares.stream()
                 .map(share -> byId.get(share.getWishlistsId()))
                 // soft-deleted wishlists drop out of findAllById
-                .filter(wishlist -> wishlist != null)
+                .filter(Objects::nonNull)
                 .map(wishlist -> new ReturnSharedWishlistDTO(wishlist.getId(), wishlist.getName(),
                         owners.get(wishlist.getUsersId())))
-                .toList();
+                .toList());
     }
 
     /** Sharing requires owning the wishlist AND being a member of the target group. */

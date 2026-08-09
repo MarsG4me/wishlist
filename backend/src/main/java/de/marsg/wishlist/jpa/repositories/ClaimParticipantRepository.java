@@ -5,6 +5,8 @@ import de.marsg.wishlist.jpa.entities.ClaimParticipantId;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,7 +15,7 @@ public interface ClaimParticipantRepository extends JpaRepository<ClaimParticipa
 
     boolean existsByWishesIdAndIdUsersId(UUID wishesId, UUID usersId);
 
-    List<ClaimParticipantEntity> findByIdUsersId(UUID usersId);
+    Page<ClaimParticipantEntity> findByIdUsersId(UUID usersId, Pageable pageable);
 
     List<ClaimParticipantEntity> findByIdClaimsId(UUID claimsId);
 

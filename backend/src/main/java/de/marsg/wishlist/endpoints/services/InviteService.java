@@ -1,8 +1,10 @@
 package de.marsg.wishlist.endpoints.services;
 
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.invites.ReturnInviteDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.GroupEntity;
 import de.marsg.wishlist.jpa.entities.GroupInviteEntity;
 import de.marsg.wishlist.jpa.repositories.GroupInviteRepository;
@@ -10,10 +12,11 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,12 +54,11 @@ public class InviteService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReturnInviteDTO> list(UUID userId, UUID groupId) {
+    public ReturnListDTO<ReturnInviteDTO> list(UUID userId, UUID groupId, Integer limit, Integer offset) {
         GroupEntity group = groupService.requireGroup(groupId);
         accessService.assertGroupAdmin(userId, group);
-        return inviteRepository.findByGroupsIdOrderByIdDesc(groupId).stream()
-                .map(ReturnInviteDTO::from)
-                .toList();
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
+        return ReturnListDTO.of(inviteRepository.findByGroupsId(groupId, pageable), ReturnInviteDTO::from);
     }
 
     @Transactional

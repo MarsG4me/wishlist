@@ -1,6 +1,7 @@
 package de.marsg.wishlist.endpoints.controller;
 
 import de.marsg.wishlist.configs.security.AuthenticatedUser;
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.CreateWishDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.ReturnOwnWishDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.ReturnUpdatedWishDTO;
@@ -9,7 +10,6 @@ import de.marsg.wishlist.endpoints.services.WishService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,9 +36,11 @@ public class WishController {
 
     @GetMapping
     @Operation(summary = "Wishes of a wishlist; owners get the claim-free view, "
-            + "group members the shared view with claims")
-    public List<?> list(AuthenticatedUser user, @RequestParam("wishlist_id") UUID wishlistId) {
-        return wishService.listByWishlist(user.userId(), wishlistId);
+            + "group members the shared view with claims (limit is clamped to 1..100)")
+    public ReturnListDTO<?> list(AuthenticatedUser user, @RequestParam("wishlist_id") UUID wishlistId,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "offset", required = false) Integer offset) {
+        return wishService.listByWishlist(user.userId(), wishlistId, limit, offset);
     }
 
     @PostMapping

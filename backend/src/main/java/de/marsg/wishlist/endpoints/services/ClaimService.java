@@ -1,10 +1,12 @@
 package de.marsg.wishlist.endpoints.services;
 
 import de.marsg.wishlist.endpoints.dto.claims.ReturnMyClaimDTO;
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.endpoints.dto.wishes.ReturnWishClaimDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.ClaimEntity;
 import de.marsg.wishlist.jpa.entities.ClaimParticipantEntity;
 import de.marsg.wishlist.jpa.entities.UserEntity;
@@ -17,10 +19,14 @@ import de.marsg.wishlist.jpa.repositories.WishRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,8 +100,10 @@ public class ClaimService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReturnMyClaimDTO> listMine(UUID userId) {
-        List<ClaimParticipantEntity> participations = participantRepository.findByIdUsersId(userId);
+    public ReturnListDTO<ReturnMyClaimDTO> listMine(UUID userId, Integer limit, Integer offset) {
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id.claimsId"));
+        Page<ClaimParticipantEntity> page = participantRepository.findByIdUsersId(userId, pageable);
+        List<ClaimParticipantEntity> participations = page.getContent();
         List<UUID> claimIds = participations.stream().map(ClaimParticipantEntity::getClaimsId).toList();
         Map<UUID, ClaimEntity> claims = claimRepository.findAllById(claimIds).stream()
                 .collect(Collectors.toMap(ClaimEntity::getId, claim -> claim));
@@ -111,7 +119,7 @@ public class ClaimService {
                 .stream()
                 .collect(Collectors.toMap(UserEntity::getId, ReturnSimpleUserDTO::from));
 
-        return participations.stream()
+        return ReturnListDTO.of(page, participations.stream()
                 .map(participation -> {
                     ClaimEntity claim = claims.get(participation.getClaimsId());
                     WishEntity wish = claim == null ? null : wishes.get(claim.getWishesId());
@@ -124,8 +132,8 @@ public class ClaimService {
                             wishlist.getId(), wishlist.getName(), owners.get(wishlist.getUsersId()),
                             participantNames(claim.getId()));
                 })
-                .filter(dto -> dto != null)
-                .toList();
+                .filter(Objects::nonNull)
+                .toList());
     }
 
     /**

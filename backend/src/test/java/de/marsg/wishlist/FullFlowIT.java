@@ -192,6 +192,15 @@ class FullFlowIT {
     }
 
     @Test
+    @Order(13)
+    void secondAccountWithTakenEmailIsRejected() throws Exception {
+        // same address, different identity provider subject -> reactivate instead of duplicate
+        mvc.perform(get("/v1/users/me").with(as(UUID.randomUUID(), "Bob", "Twin", false)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error_code").value("EMAIL_ALREADY_EXISTS"));
+    }
+
+    @Test
     @Order(14)
     void otherUserVisibleOnlyWithCommonGroup() throws Exception {
         mvc.perform(get("/v1/users/" + bobId).with(alice()))
@@ -213,8 +222,8 @@ class FullFlowIT {
                 .andExpect(jsonPath("$.wish_count").isNumber());
         mvc.perform(get("/v1/admin/users").param("email", "alice.new").with(as(ADMIN, "Ada", "Admin", true)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].email").value("alice.new@it.local"))
-                .andExpect(jsonPath("$[0].tier").value("PREMIUM"));
+                .andExpect(jsonPath("$.items[0].email").value("alice.new@it.local"))
+                .andExpect(jsonPath("$.items[0].tier").value("PREMIUM"));
     }
 
     // ---------- wishlists & wishes ----------
@@ -226,12 +235,34 @@ class FullFlowIT {
                 perform(json(post("/v1/wishlists").with(alice()), "{\"name\":\"Birthday\"}"), 201), "$.id");
         mvc.perform(get("/v1/wishlists").with(alice()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(wishlistId));
+                .andExpect(jsonPath("$.items[0].id").value(wishlistId))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.limit").value(20))
+                .andExpect(jsonPath("$.offset").value(0));
         mvc.perform(json(patch("/v1/wishlists/" + wishlistId).with(alice()), "{\"name\":\"B-Day\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("B-Day"));
         mvc.perform(get("/v1/wishlists/" + wishlistId).with(bob()))
                 .andExpect(status().isNotFound()); // not shared yet -> hidden
+    }
+
+    @Test
+    @Order(22)
+    void listPagingIsCappedAndReportsTotals() throws Exception {
+        // an oversized limit is clamped, not rejected
+        mvc.perform(get("/v1/wishlists").param("limit", "5000").with(alice()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limit").value(100));
+        mvc.perform(get("/v1/wishlists").param("limit", "0").with(alice()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limit").value(1));
+        // paging past the end keeps the total but returns nothing
+        mvc.perform(get("/v1/wishlists").param("limit", "10").param("offset", "50").with(alice()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.count").value(0))
+                .andExpect(jsonPath("$.offset").value(50));
     }
 
     @Test
@@ -257,7 +288,7 @@ class FullFlowIT {
         groupId = JsonPath.read(group, "$.id");
         mvc.perform(get("/v1/groups").with(alice()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(groupId));
+                .andExpect(jsonPath("$.items[0].id").value(groupId));
         mvc.perform(json(patch("/v1/groups/" + groupId).with(alice()), "{\"name\":\"Fam\",\"description\":null}"))
                 .andExpect(status().isOk());
 
@@ -267,7 +298,7 @@ class FullFlowIT {
         inviteCode = JsonPath.read(invite, "$.code");
         mvc.perform(get("/v1/groups/" + groupId + "/invites").with(alice()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].use_count").value(0));
+                .andExpect(jsonPath("$.items[0].use_count").value(0));
         // non-admin bob cannot see invites
         mvc.perform(get("/v1/groups/" + groupId + "/invites").with(bob()))
                 .andExpect(status().isForbidden());
@@ -287,7 +318,7 @@ class FullFlowIT {
                 .andExpect(jsonPath("$.error_code").value("ALREADY_MEMBER"));
         mvc.perform(get("/v1/memberships").param("group_id", groupId).with(bob()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4));
+                .andExpect(jsonPath("$.total").value(4));
         // membership admin toggle by owner; owner row immutable
         mvc.perform(json(patch("/v1/memberships/" + bobMembershipId).with(alice()), "{\"is_admin\":true}"))
                 .andExpect(status().isOk())
@@ -309,7 +340,7 @@ class FullFlowIT {
                 .andExpect(jsonPath("$.error_code").value("INVITE_REVOKED"));
         mvc.perform(get("/v1/groups/" + groupId + "/invites").with(alice()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].revoked_at").isNotEmpty());
+                .andExpect(jsonPath("$.items[0].revoked_at").isNotEmpty());
     }
 
     @Test
@@ -320,7 +351,7 @@ class FullFlowIT {
                 .andExpect(status().isCreated());
         mvc.perform(get("/v1/groups/" + groupId + "/shares").with(bob()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].wishlist_id").value(wishlistId));
+                .andExpect(jsonPath("$.items[0].wishlist_id").value(wishlistId));
         // duplicate share rejected
         mvc.perform(json(post("/v1/groups/" + groupId + "/shares").with(alice()),
                         "{\"wishlist_id\":\"" + wishlistId + "\"}"))
@@ -367,12 +398,12 @@ class FullFlowIT {
         String ownerView = perform(get("/v1/wishes").param("wishlist_id", wishlistId).with(alice()), 200);
         assertThat(ownerView).doesNotContain("claim", "participants", "remaining");
         String sharedView = perform(get("/v1/wishes").param("wishlist_id", wishlistId).with(bob()), 200);
-        assertThat((Integer) JsonPath.read(sharedView, "$[0].remaining")).isEqualTo(0);
-        assertThat((List<?>) JsonPath.read(sharedView, "$[0].claims")).hasSize(2);
+        assertThat((Integer) JsonPath.read(sharedView, "$.items[0].remaining")).isZero();
+        assertThat((List<?>) JsonPath.read(sharedView, "$.items[0].claims")).hasSize(2);
         // my-claims overview
         mvc.perform(get("/v1/claims").with(bob()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].wish_id").value(wishId));
+                .andExpect(jsonPath("$.items[0].wish_id").value(wishId));
     }
 
     @Test
@@ -412,7 +443,7 @@ class FullFlowIT {
                 .andExpect(status().isNoContent());
         String memberships = perform(get("/v1/memberships").param("group_id", groupId).with(alice()), 200);
         String aliceMembershipId = JsonPath.read(memberships,
-                "$[?(@.is_owner == true)].id").toString().replaceAll("[\\[\\]\"]", "");
+                "$.items[?(@.is_owner == true)].id").toString().replaceAll("[\\[\\]\"]", "");
         // demote bob -> fine, alice is still admin
         mvc.perform(json(patch("/v1/memberships/" + bobMembershipId).with(alice()), "{\"is_admin\":false}"))
                 .andExpect(status().isOk());
@@ -430,16 +461,21 @@ class FullFlowIT {
                 .andExpect(status().isNoContent());
         // the creator record moved to bob, so alice deleting her account cannot take the group with it
         String remaining = perform(get("/v1/memberships").param("group_id", groupId).with(bob()), 200);
-        List<String> creators = JsonPath.read(remaining, "$[?(@.is_owner == true)].user.displayname");
+        List<String> creators = JsonPath.read(remaining, "$.items[?(@.is_owner == true)].user.displayname");
         assertThat(creators).containsExactly("Bob Baker");
+        // leaving also stopped the sharing: alice's list is gone from the group
+        mvc.perform(get("/v1/groups/" + groupId + "/shares").with(bob()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
     }
 
     @Test
     @Order(51)
-    void unshareAndSoftDeleteEverything() throws Exception {
-        // alice left the group but still owns the wishlist -> unshare allowed
+    void deletingGroupAndWishlist() throws Exception {
+        // the share vanished with alice's membership, so there is nothing left to unshare
         mvc.perform(delete("/v1/groups/" + groupId + "/shares/" + wishlistId).with(alice()))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error_code").value("SHARE_NOT_FOUND"));
         // carol is no member anymore -> no admin rights
         mvc.perform(delete("/v1/groups/" + groupId).with(carol()))
                 .andExpect(status().isForbidden())
@@ -451,7 +487,7 @@ class FullFlowIT {
                 .andExpect(status().isNoContent());
         mvc.perform(get("/v1/wishlists").with(alice()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.total").value(0));
     }
 
     @Test

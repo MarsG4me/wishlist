@@ -15,6 +15,9 @@ public enum ErrorCode {
     ROUTE_NOT_FOUND(HttpStatus.NOT_FOUND, "The requested route does not exist"),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
+    EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT,
+            "An account with this email already exists. If it was deleted, sign in with the "
+                    + "original login to reactivate it instead of creating a new account"),
     USER_HAS_NO_COMMON_GROUP(HttpStatus.FORBIDDEN, "You share no group with this user"),
 
     WISHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "Wishlist not found"),
@@ -51,6 +54,8 @@ public enum ErrorCode {
     WISH_FULLY_CLAIMED(HttpStatus.CONFLICT, "All units of this wish are already claimed"),
 
     INVALID_CREDENTIALS(HttpStatus.FORBIDDEN, "The current password is incorrect"),
+    ACCOUNT_MANAGED_EXTERNALLY(HttpStatus.CONFLICT,
+            "This account signs in through an external provider; change email and password there"),
     KEYCLOAK_UPDATE_FAILED(HttpStatus.BAD_GATEWAY, "The account update was rejected by the identity provider"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
 

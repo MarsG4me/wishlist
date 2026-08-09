@@ -8,6 +8,8 @@ import de.marsg.wishlist.endpoints.dto.users.UpdatePasswordDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateTierDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateUserDTO;
 import de.marsg.wishlist.endpoints.services.UserService;
+import de.marsg.wishlist.helpers.ApiException;
+import de.marsg.wishlist.helpers.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -39,27 +41,38 @@ public class UserController {
     @GetMapping("/me")
     @Operation(summary = "Own user; first call provisions the account from the JWT")
     public ReturnOwnUserDTO getMe(AuthenticatedUser user) {
-        return userService.getOwnUser(user.userId());
+        return userService.getOwnUser(user.userId(), user.identityProvider());
     }
 
     @PatchMapping("/me")
     @Operation(summary = "Update the app-specific displayname")
     public ReturnOwnUserDTO updateMe(AuthenticatedUser user, @Valid @RequestBody UpdateUserDTO body) {
-        return userService.updateDisplayname(user.userId(), body.displayname());
+        return userService.updateDisplayname(user.userId(), user.identityProvider(), body.displayname());
     }
 
     @PatchMapping("/me/email")
-    @Operation(summary = "Change email (= username): applied in Keycloak first, then stored")
+    @Operation(summary = "Change email (= username): applied in Keycloak first, then stored. "
+            + "Rejected for accounts signing in through an external provider")
     public ReturnOwnUserDTO updateEmail(AuthenticatedUser user, @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody UpdateEmailDTO body) {
+        assertLocalAccount(user);
         return userService.updateEmail(user.userId(), jwt.getTokenValue(), body.email());
     }
 
     @PatchMapping("/me/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Change password in-app: current password verified, then reset in Keycloak")
+    @Operation(summary = "Change password in-app: current password verified, then reset in Keycloak. "
+            + "Rejected for accounts signing in through an external provider")
     public void updatePassword(AuthenticatedUser user, @Valid @RequestBody UpdatePasswordDTO body) {
+        assertLocalAccount(user);
         userService.updatePassword(user.userId(), body.currentPassword(), body.newPassword());
+    }
+
+    /** Google/Apple accounts have no credentials here — the provider owns them. */
+    private void assertLocalAccount(AuthenticatedUser user) {
+        if (user.isExternallyManaged()) {
+            throw new ApiException(ErrorCode.ACCOUNT_MANAGED_EXTERNALLY);
+        }
     }
 
     @DeleteMapping("/me")

@@ -19,6 +19,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
     private static final String ADMIN_AUTHORITY = "ROLE_admin";
+    private static final String IDENTITY_PROVIDER_CLAIM = "identity_provider";
 
     private final UserProvisioningService provisioningService;
 
@@ -41,7 +42,9 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         UserEntity user = provisioningService.provision(jwtAuth.getToken());
         boolean isAdmin = jwtAuth.getAuthorities().stream()
                 .anyMatch(a -> ADMIN_AUTHORITY.equals(a.getAuthority()));
+        // set by the realm's "identity_provider" session-note mapper on federated logins
+        String identityProvider = jwtAuth.getToken().getClaimAsString(IDENTITY_PROVIDER_CLAIM);
         return new AuthenticatedUser(user.getId(), user.getKeycloakId(), user.getDisplayname(),
-                user.getTier(), isAdmin);
+                user.getTier(), isAdmin, identityProvider);
     }
 }

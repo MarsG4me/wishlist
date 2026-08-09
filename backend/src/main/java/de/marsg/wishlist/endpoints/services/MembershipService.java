@@ -1,15 +1,18 @@
 package de.marsg.wishlist.endpoints.services;
 
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.memberships.ReturnMembershipDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.GroupEntity;
 import de.marsg.wishlist.jpa.entities.GroupInviteEntity;
 import de.marsg.wishlist.jpa.entities.GroupMembershipEntity;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.repositories.GroupInviteRepository;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
+import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +20,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,15 +33,17 @@ public class MembershipService {
 
     private final GroupMembershipRepository membershipRepository;
     private final GroupInviteRepository inviteRepository;
+    private final GroupWishlistShareRepository shareRepository;
     private final UserRepository userRepository;
     private final GroupService groupService;
     private final AccessService accessService;
 
     public MembershipService(GroupMembershipRepository membershipRepository,
-            GroupInviteRepository inviteRepository, UserRepository userRepository,
-            GroupService groupService, AccessService accessService) {
+            GroupInviteRepository inviteRepository, GroupWishlistShareRepository shareRepository,
+            UserRepository userRepository, GroupService groupService, AccessService accessService) {
         this.membershipRepository = membershipRepository;
         this.inviteRepository = inviteRepository;
+        this.shareRepository = shareRepository;
         this.userRepository = userRepository;
         this.groupService = groupService;
         this.accessService = accessService;
@@ -66,21 +74,22 @@ public class MembershipService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReturnMembershipDTO> list(UUID userId, UUID groupId) {
+    public ReturnListDTO<ReturnMembershipDTO> list(UUID userId, UUID groupId, Integer limit, Integer offset) {
         GroupEntity group = groupService.requireGroup(groupId);
         accessService.assertGroupMember(userId, group);
-        List<GroupMembershipEntity> memberships = membershipRepository.findByGroupsId(groupId);
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.ASC, "id"));
+        Page<GroupMembershipEntity> page = membershipRepository.findByGroupsId(groupId, pageable);
         Map<UUID, ReturnSimpleUserDTO> users = userRepository.findAllById(
-                        memberships.stream().map(GroupMembershipEntity::getUsersId).toList())
+                        page.getContent().stream().map(GroupMembershipEntity::getUsersId).toList())
                 .stream()
                 .collect(Collectors.toMap(UserEntity::getId, ReturnSimpleUserDTO::from));
-        return memberships.stream()
+        return ReturnListDTO.of(page, page.getContent().stream()
                 // memberships of soft-deleted users drop out
                 .filter(membership -> users.containsKey(membership.getUsersId()))
                 .map(membership -> ReturnMembershipDTO.from(membership,
                         users.get(membership.getUsersId()),
                         group.getUsersId().equals(membership.getUsersId())))
-                .toList();
+                .toList());
     }
 
     /** Multiple admins allowed; the LAST admin can neither be demoted (nor leave). */
@@ -114,6 +123,9 @@ public class MembershipService {
             throw new ApiException(ErrorCode.LAST_ADMIN_CANNOT_LEAVE);
         }
         membershipRepository.delete(membership);
+        // a wishlist must never stay shared with a group its owner is no longer part of
+        shareRepository.deleteAll(
+                shareRepository.findSharesOfUserInGroup(membership.getUsersId(), group.getId()));
         if (group.getUsersId().equals(membership.getUsersId())) {
             transferCreator(group, membership.getUsersId());
         }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Button } from 'primereact/button'
 import { Card } from 'primereact/card'
 import { Dialog } from 'primereact/dialog'
@@ -6,21 +6,20 @@ import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { useNavigate } from 'react-router-dom'
 import { createGroup, listGroups } from '../api/groups'
-import type { Group } from '../api/types'
+import type { Group, PageQuery } from '../api/types'
+import { ListControls } from '../components/ListControls'
 import { useApiToast } from '../hooks/useApiToast'
+import { usePagedList } from '../hooks/usePagedList'
 
 export function GroupsPage() {
-  const [groups, setGroups] = useState<Group[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const navigate = useNavigate()
   const { showError, showSuccess } = useApiToast()
 
-  const reload = () => listGroups().then(setGroups).catch(showError)
-  useEffect(() => {
-    reload()
-  }, [])
+  const fetcher = useCallback((page: PageQuery) => listGroups(page), [])
+  const list = usePagedList<Group>(fetcher, showError)
 
   const save = async () => {
     try {
@@ -29,7 +28,7 @@ export function GroupsPage() {
       setName('')
       setDescription('')
       showSuccess('Group created')
-      reload()
+      list.reload()
     } catch (e) {
       showError(e)
     }
@@ -42,7 +41,7 @@ export function GroupsPage() {
         <Button label="New group" icon="pi pi-plus" onClick={() => setDialogOpen(true)} />
       </div>
       <div className="card-grid">
-        {groups.map((group) => (
+        {list.items.map((group) => (
           <Card key={group.id} title={group.name} subTitle={group.description ?? undefined}>
             <Button
               label="Open"
@@ -52,10 +51,21 @@ export function GroupsPage() {
             />
           </Card>
         ))}
-        {groups.length === 0 && (
+        {list.total === 0 && !list.loading && (
           <p className="muted">No groups yet — create one or join via an invite link.</p>
         )}
       </div>
+      <ListControls
+        total={list.total}
+        limit={list.limit}
+        offset={list.offset}
+        loading={list.loading}
+        isMobile={list.isMobile}
+        hasMore={list.hasMore}
+        onLimit={list.setLimit}
+        onOffset={list.setOffset}
+        onLoadMore={list.loadMore}
+      />
       <Dialog
         header="New group"
         visible={dialogOpen}

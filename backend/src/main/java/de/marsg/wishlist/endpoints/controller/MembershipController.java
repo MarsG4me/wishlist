@@ -1,6 +1,7 @@
 package de.marsg.wishlist.endpoints.controller;
 
 import de.marsg.wishlist.configs.security.AuthenticatedUser;
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
 import de.marsg.wishlist.endpoints.dto.memberships.JoinGroupDTO;
 import de.marsg.wishlist.endpoints.dto.memberships.ReturnMembershipDTO;
 import de.marsg.wishlist.endpoints.dto.memberships.UpdateAdminStateDTO;
@@ -8,7 +9,6 @@ import de.marsg.wishlist.endpoints.services.MembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,9 +41,12 @@ public class MembershipController {
     }
 
     @GetMapping
-    @Operation(summary = "Members of a group (member)")
-    public List<ReturnMembershipDTO> list(AuthenticatedUser user, @RequestParam("group_id") UUID groupId) {
-        return membershipService.list(user.userId(), groupId);
+    @Operation(summary = "Members of a group (member; limit is clamped to 1..100)")
+    public ReturnListDTO<ReturnMembershipDTO> list(AuthenticatedUser user,
+            @RequestParam("group_id") UUID groupId,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "offset", required = false) Integer offset) {
+        return membershipService.list(user.userId(), groupId, limit, offset);
     }
 
     @PatchMapping("/{id}")

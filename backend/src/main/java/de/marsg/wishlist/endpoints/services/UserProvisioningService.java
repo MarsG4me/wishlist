@@ -1,5 +1,7 @@
 package de.marsg.wishlist.endpoints.services;
 
+import de.marsg.wishlist.helpers.ApiException;
+import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import java.util.UUID;
@@ -34,17 +36,31 @@ public class UserProvisioningService {
 
     private UserEntity restoreOrCreate(Jwt jwt, UUID keycloakId) {
         return userRepository.findByKeycloakIdIncludingDeleted(keycloakId)
-                .map(deleted -> {
-                    deleted.restore();
-                    log.info("Restored soft-deleted user {}", deleted.getId());
-                    return userRepository.save(deleted);
-                })
-                .orElseGet(() -> {
-                    UserEntity created = userRepository.save(
-                            new UserEntity(keycloakId, displaynameFrom(jwt), emailFrom(jwt)));
-                    log.info("Provisioned new user {}", created.getId());
-                    return created;
-                });
+                .map(this::restore)
+                .orElseGet(() -> create(jwt, keycloakId));
+    }
+
+    private UserEntity restore(UserEntity deleted) {
+        deleted.restore();
+        log.info("Restored soft-deleted user {}", deleted.getId());
+        return userRepository.save(deleted);
+    }
+
+    /**
+     * An email belongs to exactly one account. If it is already taken — including by a
+     * soft-deleted account inside the 30-day window — the user must sign in with the
+     * original login to reactivate rather than create a second account.
+     */
+    private UserEntity create(Jwt jwt, UUID keycloakId) {
+        String email = emailFrom(jwt);
+        userRepository.findByEmailIncludingDeleted(email).ifPresent(existing -> {
+            log.warn("Rejected provisioning for keycloak user {}: email already used by user {}",
+                    keycloakId, existing.getId());
+            throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        });
+        UserEntity created = userRepository.save(new UserEntity(keycloakId, displaynameFrom(jwt), email));
+        log.info("Provisioned new user {}", created.getId());
+        return created;
     }
 
     private String displaynameFrom(Jwt jwt) {

@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { OwnWish, SharedWish, UpdatedWish, WishLink } from './types'
+import type { ListResponse, OwnWish, PageQuery, SharedWish, UpdatedWish, WishLink } from './types'
 
 export interface WishInput {
   name: string
@@ -8,9 +8,12 @@ export interface WishInput {
   links: WishLink[]
 }
 
-/** Owner gets OwnWish[]; group members get SharedWish[] (with claims). */
-export const listWishes = async (wishlistId: string): Promise<(OwnWish | SharedWish)[]> =>
-  (await api.get('/v1/wishes', { params: { wishlist_id: wishlistId } })).data
+/** Owner gets OwnWish items; group members get SharedWish items (with claims). */
+export const listWishes = async (
+  wishlistId: string,
+  page: PageQuery = {},
+): Promise<ListResponse<OwnWish | SharedWish>> =>
+  (await api.get('/v1/wishes', { params: { wishlist_id: wishlistId, ...page } })).data
 
 export const createWish = async (wishlistId: string, input: WishInput): Promise<OwnWish> =>
   (await api.post('/v1/wishes', { wishlist_id: wishlistId, ...input })).data

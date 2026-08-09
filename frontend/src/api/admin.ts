@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { UserTier } from './types'
+import type { ListResponse, PageQuery, UserTier } from './types'
 
 export interface AdminStats {
   user_count: number
@@ -16,5 +16,8 @@ export interface AdminUser {
 
 export const getAdminStats = async (): Promise<AdminStats> => (await api.get('/v1/admin/stats')).data
 
-export const searchUsersByEmail = async (email: string): Promise<AdminUser[]> =>
-  (await api.get('/v1/admin/users', { params: { email } })).data
+export const searchUsersByEmail = async (
+  email: string,
+  page: PageQuery = {},
+): Promise<ListResponse<AdminUser>> =>
+  (await api.get('/v1/admin/users', { params: { email, ...page } })).data

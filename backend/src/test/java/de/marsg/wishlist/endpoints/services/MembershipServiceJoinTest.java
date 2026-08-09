@@ -11,6 +11,7 @@ import de.marsg.wishlist.jpa.entities.GroupEntity;
 import de.marsg.wishlist.jpa.entities.GroupInviteEntity;
 import de.marsg.wishlist.jpa.repositories.GroupInviteRepository;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
+import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
@@ -29,6 +30,8 @@ class MembershipServiceJoinTest {
     @Mock
     private GroupInviteRepository inviteRepository;
     @Mock
+    private GroupWishlistShareRepository shareRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private GroupService groupService;
@@ -44,7 +47,7 @@ class MembershipServiceJoinTest {
     @BeforeEach
     void setUp() {
         membershipService = new MembershipService(membershipRepository, inviteRepository,
-                userRepository, groupService, accessService);
+                shareRepository, userRepository, groupService, accessService);
     }
 
     private GroupInviteEntity mockInvite(boolean revoked, boolean expired) {

@@ -2,10 +2,13 @@ package de.marsg.wishlist.endpoints.services;
 
 import de.marsg.wishlist.endpoints.dto.admin.ReturnAdminStatsDTO;
 import de.marsg.wishlist.endpoints.dto.admin.ReturnAdminUserDTO;
+import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
+import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
-import java.util.List;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,9 +40,9 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReturnAdminUserDTO> searchByEmail(String email) {
-        return userRepository.findTop20ByEmailContainingIgnoreCaseOrderByEmailAsc(email).stream()
-                .map(ReturnAdminUserDTO::from)
-                .toList();
+    public ReturnListDTO<ReturnAdminUserDTO> searchByEmail(String email, Integer limit, Integer offset) {
+        Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.ASC, "email"));
+        return ReturnListDTO.of(userRepository.findByEmailContainingIgnoreCase(email, pageable),
+                ReturnAdminUserDTO::from);
     }
 }
