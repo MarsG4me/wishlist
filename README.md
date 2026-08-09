@@ -14,14 +14,20 @@ wishes (reserve them as gifts) so nothing gets gifted twice. The wish owner neve
 ## Local development
 
 ```bash
-# 1. Infrastructure
-docker compose up -d
+./start.sh              # containers + backend + frontend, waits until everything answers
+./start.sh --down       # stop backend, frontend and the containers
+./start.sh --rebuild    # wipe the database volume first (fresh schema and data)
+```
 
-# 2. Backend (http://localhost:6543, Swagger UI: /docs/api-ui.html)
-cd backend && mvn spring-boot:run
+Ctrl+C stops backend and frontend and leaves the containers running.
+Logs land in `/tmp/wishlist-dev/`.
 
-# 3. Frontend (http://localhost:5173)
-cd frontend && npm install && npm run dev
+Starting the parts by hand instead:
+
+```bash
+docker compose up -d                 # Postgres 18 (host port 5433) + Keycloak 26
+cd backend && mvn spring-boot:run    # http://localhost:6543, Swagger at /docs/api-ui.html
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
 Keycloak: http://localhost:8180 (admin/admin). Realm `wishlist-dev` is imported on first start.
