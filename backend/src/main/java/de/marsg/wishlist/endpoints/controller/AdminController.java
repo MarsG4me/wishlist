@@ -1,5 +1,6 @@
 package de.marsg.wishlist.endpoints.controller;
 
+import de.marsg.wishlist.configs.security.AuthenticatedUser;
 import de.marsg.wishlist.endpoints.dto.admin.ReturnAdminStatsDTO;
 import de.marsg.wishlist.endpoints.dto.admin.ReturnAdminUserDTO;
 import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
@@ -35,9 +36,10 @@ public class AdminController {
 
     @GetMapping("/users")
     @Operation(summary = "Search accounts by email (partial match) for tier management")
-    public ReturnListDTO<ReturnAdminUserDTO> searchUsers(@RequestParam("email") @NotBlank String email,
+    public ReturnListDTO<ReturnAdminUserDTO> searchUsers(AuthenticatedUser user,
+            @RequestParam("email") @NotBlank String email,
             @RequestParam(value = "limit", required = false) Integer limit,
             @RequestParam(value = "offset", required = false) Integer offset) {
-        return adminService.searchByEmail(email, limit, offset);
+        return adminService.searchByEmail(user.userId(), email, limit, offset);
     }
 }

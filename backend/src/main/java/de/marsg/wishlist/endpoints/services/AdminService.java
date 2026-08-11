@@ -7,6 +7,9 @@ import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AdminService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
     private final UserRepository userRepository;
     private final WishlistRepository wishlistRepository;
@@ -39,10 +44,14 @@ public class AdminService {
                 wishRepository.count());
     }
 
+    /** Substring search reaches every account, so who looked for what is audited. */
     @Transactional(readOnly = true)
-    public ReturnListDTO<ReturnAdminUserDTO> searchByEmail(String email, Integer limit, Integer offset) {
+    public ReturnListDTO<ReturnAdminUserDTO> searchByEmail(UUID adminId, String email, Integer limit,
+            Integer offset) {
         Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.ASC, "email"));
-        return ReturnListDTO.of(userRepository.findByEmailContainingIgnoreCase(email, pageable),
-                ReturnAdminUserDTO::from);
+        ReturnListDTO<ReturnAdminUserDTO> result = ReturnListDTO.of(
+                userRepository.findByEmailContainingIgnoreCase(email, pageable), ReturnAdminUserDTO::from);
+        log.info("Admin {} searched accounts for \"{}\": {} match(es)", adminId, email, result.total());
+        return result;
     }
 }
