@@ -19,6 +19,11 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/wishlist-dev}
+          # Issuer alone is not enough: every client of the realm mints tokens with the
+          # same issuer, so without an audience check a token meant for any other client
+          # (incl. the public direct-grant one) would authenticate here. The clients that
+          # may talk to this API carry the audience via an oidc-audience-mapper.
+          audiences: ${KEYCLOAK_AUDIENCE:wishlist-api}
 
 springdoc:
   api-docs:

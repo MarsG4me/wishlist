@@ -91,6 +91,17 @@
             "access.token.claim": "true",
             "id.token.claim": "true"
           }
+        },
+        {
+          "name": "wishlist-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "wishlist-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         }
       ]
     },
@@ -103,7 +114,20 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "redirectUris": [],
-      "webOrigins": []
+      "webOrigins": [],
+      "protocolMappers": [
+        {
+          "name": "wishlist-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "wishlist-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "wishlist-backend",
