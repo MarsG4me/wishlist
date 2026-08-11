@@ -1,8 +1,9 @@
 import axios from 'axios'
 import { keycloak } from '../auth/keycloak'
+import { config } from '../config'
 import { ApiError } from './errors'
 
-export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL })
+export const api = axios.create({ baseURL: config.apiUrl })
 
 api.interceptors.request.use(async (config) => {
   try {
