@@ -208,9 +208,14 @@ class FullFlowIT {
     @Test
     @Order(14)
     void otherUserVisibleOnlyWithCommonGroup() throws Exception {
+        // answered exactly like an unknown id, so the endpoint cannot be used to probe
+        // which user ids exist
         mvc.perform(get("/v1/users/" + bobId).with(alice()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error_code").value("USER_HAS_NO_COMMON_GROUP"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error_code").value("USER_NOT_FOUND"));
+        mvc.perform(get("/v1/users/" + UUID.randomUUID()).with(alice()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error_code").value("USER_NOT_FOUND"));
     }
 
     @Test

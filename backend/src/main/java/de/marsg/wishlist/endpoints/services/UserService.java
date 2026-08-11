@@ -108,15 +108,17 @@ public class UserService {
         log.info("Soft-deleted user {}", userId);
     }
 
-    /** Other users are only visible when both share at least one group. */
+    /**
+     * Other users are only visible when both share at least one group. An id without a
+     * common group is answered exactly like an unknown one, so the endpoint cannot be
+     * used to test which user ids exist.
+     */
     @Transactional(readOnly = true)
     public ReturnSimpleUserDTO getOtherUser(UUID requesterId, UUID targetId) {
         UserEntity target = userRepository.findById(targetId)
+                .filter(found -> requesterId.equals(targetId)
+                        || membershipRepository.existsGroupWithBothUsers(requesterId, targetId))
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
-        if (!requesterId.equals(targetId)
-                && !membershipRepository.existsGroupWithBothUsers(requesterId, targetId)) {
-            throw new ApiException(ErrorCode.USER_HAS_NO_COMMON_GROUP);
-        }
         return ReturnSimpleUserDTO.from(target);
     }
 
