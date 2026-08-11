@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+**/node_modules
+**/dist
+**/target
+tests
+infra
+docker-compose.yml
+start.sh
+deploy/.env
+**/*.log

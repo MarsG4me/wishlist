@@ -1,0 +1,59 @@
+# Deployment stack. Postgres and Keycloak are NOT part of it — they are hosted
+# externally and reached over the network. This compose runs the single app image
+# (SPA + backend + inner nginx); the outer nginx terminates TLS, publishes the
+# hostname and rate-limits Keycloak.
+#
+#   cp .env.example .env && $EDITOR .env
+#   docker compose up -d --build
+services:
+  wishlist:
+    image: ${WISHLIST_IMAGE:-wishlist}:${WISHLIST_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    # the JVM needs ~10s to unwind; docker's default 10s would SIGKILL it mid-shutdown
+    stop_grace_period: 45s
+    # Bound to the loopback interface: only the outer nginx talks to it. If that nginx
+    # runs in docker too, drop this and put both on a shared external network instead.
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:8080"
+    environment:
+      # --- external Postgres ---
+      DB_URL: ${DB_URL:?set DB_URL}
+      DB_USER: ${DB_USER:?set DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+
+      # --- external Keycloak (backend side) ---
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_URL:?set KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:?set KEYCLOAK_REALM}
+      KEYCLOAK_BASE_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-wishlist-api}
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-wishlist-backend}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?set KEYCLOAK_ADMIN_CLIENT_SECRET}
+      KEYCLOAK_VERIFY_CLIENT_ID: ${KEYCLOAK_VERIFY_CLIENT_ID:-wishlist-cli}
+
+      # --- SPA runtime config, written to /config.js at start-up ---
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-wishlist-frontend}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      ADS_ENABLED: ${ADS_ENABLED:-false}
+
+      # --- app ---
+      FRONTEND_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN}
+      PURGE_ENABLED: ${PURGE_ENABLED:-true}
+      # real client addresses for the inner rate limits and the /health allowlist
+      TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR:?set TRUSTED_PROXY_CIDR}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError}
+    # HEALTHCHECK ships in the image; only the start-up grace is deployment-specific
+    healthcheck:
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp

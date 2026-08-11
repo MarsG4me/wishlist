@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+# deployment secrets
+deploy/.env
+
 # python e2e
 tests/e2e/.venv/
 tests/e2e/.pytest_cache/

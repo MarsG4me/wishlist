@@ -1,0 +1,10 @@
+# Production overrides. Activate with SPRING_PROFILES_ACTIVE=prod.
+#
+# The OpenAPI spec and the Swagger UI live under /docs/**, which SecurityConfig permits
+# anonymously so the UI can bootstrap itself in dev. In production that would publish the
+# whole API surface to anyone, so the endpoints are switched off instead of merely hidden.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -44,6 +44,35 @@ TOKEN=$(curl -s http://localhost:8180/realms/wishlist-dev/protocol/openid-connec
 curl -H "Authorization: Bearer $TOKEN" http://localhost:6543/v1/users/me
 ```
 
+## Deployment
+
+Postgres and Keycloak are hosted externally; everything of ours ships as **one image**
+(`deploy/Dockerfile`): the built SPA, the backend, and an nginx that serves the SPA,
+proxies `/v1` to `127.0.0.1:6543` and rate-limits the sensitive endpoints. TLS, the public
+hostname and Keycloak's rate limiting belong to the **outer** nginx in front of it.
+
+```bash
+cd deploy
+cp .env.example .env && $EDITOR .env    # external DB + Keycloak coordinates, secrets
+docker compose up -d --build            # publishes 127.0.0.1:8080 for the outer nginx
+```
+
+| Inside the image | |
+|---|---|
+| nginx | port 8080; SPA with SPA-fallback, `/v1/**` proxied, `/docs/**` unrouted (falls back to the SPA) |
+| Rate limits | 20r/s per client on `/v1/**`; 12r/min on `/v1/users/me/password`, `/v1/users/me/email`, `/v1/memberships/join` |
+| `/health` | private networks + loopback only — do not proxy it from the outer nginx |
+| Backend | `SPRING_PROFILES_ACTIVE=prod` (Swagger and the OpenAPI spec off), runs as uid 10001 |
+
+Client addresses come from `X-Forwarded-For`, but only for the proxies listed in
+`TRUSTED_PROXY_CIDR` — set it, or the rate limits key on the outer nginx and everyone
+shares one bucket.
+
+The SPA is configured at **runtime**: the entrypoint writes `/config.js` from the
+container's environment (`KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`,
+`PUBLIC_API_URL`, `ADS_ENABLED`), so the same image runs in any environment. The
+`VITE_*` vars in `frontend/.env.development` are only the dev-server fallback.
+
 ## Configuration (env vars)
 
 | Var | Default |
