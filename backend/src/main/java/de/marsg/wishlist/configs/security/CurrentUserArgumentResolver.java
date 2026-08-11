@@ -5,6 +5,7 @@ import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import org.springframework.core.MethodParameter;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -39,12 +40,25 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         if (!(authentication instanceof JwtAuthenticationToken jwtAuth)) {
             throw new ApiException(ErrorCode.UNAUTHENTICATED);
         }
-        UserEntity user = provisioningService.provision(jwtAuth.getToken());
+        UserEntity user = provision(jwtAuth);
         boolean isAdmin = jwtAuth.getAuthorities().stream()
                 .anyMatch(a -> ADMIN_AUTHORITY.equals(a.getAuthority()));
         // set by the realm's "identity_provider" session-note mapper on federated logins
         String identityProvider = jwtAuth.getToken().getClaimAsString(IDENTITY_PROVIDER_CLAIM);
         return new AuthenticatedUser(user.getId(), user.getKeycloakId(), user.getDisplayname(),
                 user.getTier(), isAdmin, identityProvider);
+    }
+
+    /**
+     * The first two requests of a new account can race into the same insert. The loser's
+     * transaction rolls back, so the retry runs in a fresh one and simply finds the row
+     * the winner committed — retrying inside the failed transaction could not work.
+     */
+    private UserEntity provision(JwtAuthenticationToken jwtAuth) {
+        try {
+            return provisioningService.provision(jwtAuth.getToken());
+        } catch (DataIntegrityViolationException e) {
+            return provisioningService.provision(jwtAuth.getToken());
+        }
     }
 }

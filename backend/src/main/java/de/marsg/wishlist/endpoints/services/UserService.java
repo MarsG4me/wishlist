@@ -13,6 +13,7 @@ import de.marsg.wishlist.jpa.repositories.UserRepository;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +62,13 @@ public class UserService {
                 });
         keycloakAccountClient.updateEmail(bearerToken, newEmail);
         user.setEmail(newEmail);
+        try {
+            // flushed here on purpose: the check above is not atomic, and a violation
+            // surfacing at commit time would leave the caller with a bare 500
+            userRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
         log.info("Updated email of user {}", userId);
         return ReturnOwnUserDTO.from(user, null);
     }
