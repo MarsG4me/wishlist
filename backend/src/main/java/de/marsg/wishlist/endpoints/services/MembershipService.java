@@ -9,6 +9,7 @@ import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.GroupEntity;
 import de.marsg.wishlist.jpa.entities.GroupInviteEntity;
 import de.marsg.wishlist.jpa.entities.GroupMembershipEntity;
+import de.marsg.wishlist.jpa.entities.GroupWishlistShareEntity;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.repositories.GroupInviteRepository;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
@@ -37,16 +38,19 @@ public class MembershipService {
     private final UserRepository userRepository;
     private final GroupService groupService;
     private final AccessService accessService;
+    private final ClaimService claimService;
 
     public MembershipService(GroupMembershipRepository membershipRepository,
             GroupInviteRepository inviteRepository, GroupWishlistShareRepository shareRepository,
-            UserRepository userRepository, GroupService groupService, AccessService accessService) {
+            UserRepository userRepository, GroupService groupService, AccessService accessService,
+            ClaimService claimService) {
         this.membershipRepository = membershipRepository;
         this.inviteRepository = inviteRepository;
         this.shareRepository = shareRepository;
         this.userRepository = userRepository;
         this.groupService = groupService;
         this.accessService = accessService;
+        this.claimService = claimService;
     }
 
     /** Redeems an invite code; the atomic use_count increment blocks racing over-joins. */
@@ -122,10 +126,17 @@ public class MembershipService {
         if (membership.isAdmin() && isLastAdmin(group.getId())) {
             throw new ApiException(ErrorCode.LAST_ADMIN_CANNOT_LEAVE);
         }
+        // taken before the change: the leaver loses sight of all of them, and the rest of
+        // the group loses sight of the leaver's own ones
+        List<UUID> sharedWishlists = shareRepository.findByGroupsId(group.getId()).stream()
+                .map(GroupWishlistShareEntity::getWishlistsId)
+                .toList();
         membershipRepository.delete(membership);
         // a wishlist must never stay shared with a group its owner is no longer part of
         shareRepository.deleteAll(
                 shareRepository.findSharesOfUserInGroup(membership.getUsersId(), group.getId()));
+        shareRepository.flush();
+        claimService.purgeParticipationsWithoutAccess(sharedWishlists);
         if (group.getUsersId().equals(membership.getUsersId())) {
             transferCreator(group, membership.getUsersId());
         }

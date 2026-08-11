@@ -22,6 +22,7 @@ import de.marsg.wishlist.jpa.repositories.ClaimRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -141,11 +142,18 @@ public class WishService {
         }
         Map<UUID, List<ReturnSimpleUserDTO>> participantsByClaim = new LinkedHashMap<>();
         Set<UUID> claimsOfRequester = new HashSet<>();
+        Map<UUID, Boolean> mayIdentify = new HashMap<>();
         for (Object[] row : participantRepository.findParticipantRowsForWishes(wishIds)) {
             UUID claimId = (UUID) row[0];
             UUID participantId = (UUID) row[2];
+            // the wishlist may be shared into several groups, so a co-claimer is not
+            // automatically someone this requester is allowed to put a name to
+            boolean named = mayIdentify.computeIfAbsent(participantId,
+                    id -> accessService.mayIdentify(requesterId, id));
             participantsByClaim.computeIfAbsent(claimId, k -> new ArrayList<>())
-                    .add(new ReturnSimpleUserDTO(participantId, (String) row[3]));
+                    .add(named
+                            ? new ReturnSimpleUserDTO(participantId, (String) row[3])
+                            : ReturnSimpleUserDTO.unnamed(participantId));
             if (participantId.equals(requesterId)) {
                 claimsOfRequester.add(claimId);
             }

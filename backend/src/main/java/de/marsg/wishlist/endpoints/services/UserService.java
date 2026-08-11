@@ -25,13 +25,16 @@ public class UserService {
     private final GroupMembershipRepository membershipRepository;
     private final GroupWishlistShareRepository shareRepository;
     private final KeycloakAccountClient keycloakAccountClient;
+    private final ClaimService claimService;
 
     public UserService(UserRepository userRepository, GroupMembershipRepository membershipRepository,
-            GroupWishlistShareRepository shareRepository, KeycloakAccountClient keycloakAccountClient) {
+            GroupWishlistShareRepository shareRepository, KeycloakAccountClient keycloakAccountClient,
+            ClaimService claimService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.shareRepository = shareRepository;
         this.keycloakAccountClient = keycloakAccountClient;
+        this.claimService = claimService;
     }
 
     @Transactional(readOnly = true)
@@ -92,6 +95,8 @@ public class UserService {
         user.markDeleted();
         // stop sharing immediately: a deleted account's wishlists disappear from every group
         shareRepository.deleteAll(shareRepository.findSharesOfUser(userId));
+        // and stop gifting: the claims would otherwise block wishes with an invisible claimer
+        claimService.removeAllParticipationsOf(userId);
         log.info("Soft-deleted user {}", userId);
     }
 

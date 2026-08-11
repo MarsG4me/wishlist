@@ -9,6 +9,7 @@ import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.helpers.PageParams;
 import de.marsg.wishlist.jpa.entities.ClaimEntity;
 import de.marsg.wishlist.jpa.entities.ClaimParticipantEntity;
+import de.marsg.wishlist.jpa.entities.ClaimParticipantId;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.entities.WishEntity;
 import de.marsg.wishlist.jpa.entities.WishlistEntity;
@@ -17,6 +18,9 @@ import de.marsg.wishlist.jpa.repositories.ClaimRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,7 +98,10 @@ public class ClaimService {
     public ReturnWishClaimDTO setShared(UUID userId, UUID claimId, boolean shared) {
         ClaimEntity claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new ApiException(ErrorCode.CLAIM_NOT_FOUND));
-        if (!userId.equals(claim.getUsersId())) {
+        // being recorded as creator is not enough: someone who left the claim (or lost
+        // access to the wishlist) must not keep steering who may pool money into it
+        if (!userId.equals(claim.getUsersId())
+                || !participantRepository.existsById(new ClaimParticipantId(claimId, userId))) {
             throw new ApiException(ErrorCode.NOT_CLAIM_OWNER);
         }
         claim.setShared(shared);
@@ -111,12 +118,63 @@ public class ClaimService {
                 .orElseThrow(() -> new ApiException(ErrorCode.CLAIM_NOT_FOUND));
         participantRepository.delete(participant);
         participantRepository.flush();
-        if (participantRepository.countByIdClaimsId(claimId) == 0) {
-            claimRepository.deleteById(claimId);
-            log.info("User {} left claim {}; claim removed (last participant)", userId, claimId);
-        } else {
-            log.info("User {} left claim {}", userId, claimId);
+        log.info("User {} left claim {}", userId, claimId);
+        settleClaimAfterDeparture(claimId);
+    }
+
+    /**
+     * Revocation cleanup. A claim is only ever visible through the wishlist it hangs on,
+     * so losing sight of that wishlist must end the participation too — otherwise an
+     * unshared wishlist or a removed group member keeps leaking wish, wishlist and owner
+     * through the claim overview. Call after the revoking change is flushed, with every
+     * wishlist whose audience it touched.
+     */
+    @Transactional
+    public void purgeParticipationsWithoutAccess(Collection<UUID> wishlistIds) {
+        if (wishlistIds.isEmpty()) {
+            return;
         }
+        Map<UUID, UUID> wishlistByWish = wishRepository.findByWishlistsIdIn(wishlistIds).stream()
+                .collect(Collectors.toMap(WishEntity::getId, WishEntity::getWishlistsId));
+        if (wishlistByWish.isEmpty()) {
+            return;
+        }
+        Map<Viewer, Boolean> mayView = new HashMap<>();
+        List<ClaimParticipantEntity> stale =
+                participantRepository.findByWishesIdIn(wishlistByWish.keySet()).stream()
+                        .filter(participant -> !mayView.computeIfAbsent(
+                                new Viewer(participant.getUsersId(),
+                                        wishlistByWish.get(participant.getWishesId())),
+                                viewer -> accessService.canViewAsSharedWishlist(
+                                        viewer.userId(), viewer.wishlistId())))
+                        .toList();
+        if (stale.isEmpty()) {
+            return;
+        }
+        participantRepository.deleteAll(stale);
+        participantRepository.flush();
+        stale.stream().map(ClaimParticipantEntity::getClaimsId).distinct()
+                .forEach(this::settleClaimAfterDeparture);
+        log.info("Revoked {} claim participation(s) after access to {} wishlist(s) changed",
+                stale.size(), wishlistIds.size());
+    }
+
+    /**
+     * Account deletion: the person is gone, so their participations go with them. Without
+     * this a deleted account would keep a single-unit wish blocked by a claim that renders
+     * with nobody in it, until the 30-day purge finally cascades it away.
+     */
+    @Transactional
+    public void removeAllParticipationsOf(UUID userId) {
+        List<ClaimParticipantEntity> participations = participantRepository.findByIdUsersId(userId);
+        if (participations.isEmpty()) {
+            return;
+        }
+        participantRepository.deleteAll(participations);
+        participantRepository.flush();
+        participations.stream().map(ClaimParticipantEntity::getClaimsId).distinct()
+                .forEach(this::settleClaimAfterDeparture);
+        log.info("Removed {} claim participation(s) of user {}", participations.size(), userId);
     }
 
     @Transactional(readOnly = true)
@@ -139,6 +197,7 @@ public class ClaimService {
                 .stream()
                 .collect(Collectors.toMap(UserEntity::getId, ReturnSimpleUserDTO::from));
 
+        Map<UUID, Boolean> mayView = new HashMap<>();
         return ReturnListDTO.of(page, participations.stream()
                 .map(participation -> {
                     ClaimEntity claim = claims.get(participation.getClaimsId());
@@ -148,9 +207,16 @@ public class ClaimService {
                     if (wishlist == null) {
                         return null;
                     }
+                    // second line of defence behind purgeParticipationsWithoutAccess: a claim
+                    // must never outlive the share that made its wishlist visible
+                    boolean visible = mayView.computeIfAbsent(wishlist.getId(),
+                            id -> accessService.canViewAsSharedWishlist(userId, id));
+                    if (!visible) {
+                        return null;
+                    }
                     return new ReturnMyClaimDTO(claim.getId(), wish.getId(), wish.getName(),
                             wishlist.getId(), wishlist.getName(), owners.get(wishlist.getUsersId()),
-                            participantNames(claim.getId()), userId.equals(claim.getUsersId()),
+                            participantNames(userId, claim.getId()), userId.equals(claim.getUsersId()),
                             claim.isShared());
                 })
                 .filter(Objects::nonNull)
@@ -184,16 +250,49 @@ public class ClaimService {
      * by definition, so joining again is never an option here.
      */
     private ReturnWishClaimDTO mine(UUID userId, ClaimEntity claim) {
-        return new ReturnWishClaimDTO(claim.getId(), participantNames(claim.getId()), true,
+        return new ReturnWishClaimDTO(claim.getId(), participantNames(userId, claim.getId()), true,
                 userId.equals(claim.getUsersId()), claim.isShared(), false);
     }
 
-    private List<ReturnSimpleUserDTO> participantNames(UUID claimId) {
+    /**
+     * A claim without its creator is not abandoned as long as co-claimers keep paying into
+     * it: the creator rights move to one of them. Only an empty claim is deleted, which
+     * frees the wish unit again.
+     */
+    private void settleClaimAfterDeparture(UUID claimId) {
+        List<ClaimParticipantEntity> remaining = participantRepository.findByIdClaimsId(claimId);
+        if (remaining.isEmpty()) {
+            claimRepository.deleteById(claimId);
+            log.info("Claim {} removed (last participant gone)", claimId);
+            return;
+        }
+        claimRepository.findById(claimId).ifPresent(claim -> {
+            boolean creatorStillIn = remaining.stream()
+                    .anyMatch(row -> row.getUsersId().equals(claim.getUsersId()));
+            if (!creatorStillIn) {
+                UUID heir = remaining.stream()
+                        .map(ClaimParticipantEntity::getUsersId)
+                        .min(Comparator.naturalOrder())
+                        .orElseThrow();
+                claim.transferCreatorTo(heir);
+                log.info("Transferred claim {} to co-claimer {}", claimId, heir);
+            }
+        });
+    }
+
+    /** Co-claimers the requester shares no group with stay unnamed — see AccessService#mayIdentify. */
+    private List<ReturnSimpleUserDTO> participantNames(UUID requesterId, UUID claimId) {
         List<UUID> userIds = participantRepository.findByIdClaimsId(claimId).stream()
                 .map(ClaimParticipantEntity::getUsersId)
                 .toList();
         return userRepository.findAllById(userIds).stream()
-                .map(ReturnSimpleUserDTO::from)
+                .map(user -> accessService.mayIdentify(requesterId, user.getId())
+                        ? ReturnSimpleUserDTO.from(user)
+                        : ReturnSimpleUserDTO.unnamed(user.getId()))
                 .toList();
+    }
+
+    /** Cache key of the "may this user still see that wishlist" question. */
+    private record Viewer(UUID userId, UUID wishlistId) {
     }
 }

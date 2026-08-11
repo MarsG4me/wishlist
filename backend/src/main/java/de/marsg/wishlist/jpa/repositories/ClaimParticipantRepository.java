@@ -17,9 +17,12 @@ public interface ClaimParticipantRepository extends JpaRepository<ClaimParticipa
 
     Page<ClaimParticipantEntity> findByIdUsersId(UUID usersId, Pageable pageable);
 
+    List<ClaimParticipantEntity> findByIdUsersId(UUID usersId);
+
     List<ClaimParticipantEntity> findByIdClaimsId(UUID claimsId);
 
-    long countByIdClaimsId(UUID claimsId);
+    /** Every participation on a set of wishes — input of the revocation cleanup. */
+    List<ClaimParticipantEntity> findByWishesIdIn(Collection<UUID> wishesIds);
 
     /** Participant rows with displaynames for a set of wishes (shared-view rendering). */
     @Query("""

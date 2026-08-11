@@ -23,8 +23,12 @@ public class ClaimEntity {
     @Column(name = "wishes_id", nullable = false, updatable = false)
     private UUID wishesId;
 
-    /** Creator. */
-    @Column(name = "users_id", nullable = false, updatable = false)
+    /**
+     * Creator: the only participant who may open or close the claim. Handed to a
+     * remaining co-claimer when they leave or lose access, so the rights never sit
+     * with someone who is no longer part of the claim.
+     */
+    @Column(name = "users_id", nullable = false)
     private UUID usersId;
 
     /** Opened up by the creator so others may join and pool money. */
@@ -49,6 +53,10 @@ public class ClaimEntity {
 
     public UUID getUsersId() {
         return usersId;
+    }
+
+    public void transferCreatorTo(UUID usersId) {
+        this.usersId = usersId;
     }
 
     public boolean isShared() {

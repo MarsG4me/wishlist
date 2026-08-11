@@ -57,7 +57,7 @@ export function MyClaimsPage() {
             return (
               <div className="claim-row">
                 {others.map((participant) => (
-                  <Chip key={participant.id} label={participant.displayname} />
+                  <Chip key={participant.id} label={participant.displayname ?? t('claims.someoneElse')} />
                 ))}
               </div>
             )

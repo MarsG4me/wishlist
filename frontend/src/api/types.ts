@@ -32,6 +32,15 @@ export interface SimpleUser {
   displayname: string
 }
 
+/**
+ * A claimer. Unlike everywhere else the name may be missing: a wishlist can be shared
+ * into several groups, and someone gifting from a group we are not in stays anonymous.
+ */
+export interface ClaimParticipant {
+  id: string
+  displayname: string | null
+}
+
 export interface Wishlist {
   id: string
   user_id: string
@@ -55,7 +64,7 @@ export interface OwnWish {
 
 export interface WishClaim {
   claim_id: string
-  participants: SimpleUser[]
+  participants: ClaimParticipant[]
   /** Whether the requester is part of this claim (backend-decided). */
   is_participant: boolean
   /** Whether the requester created it and may therefore open or close it. */
@@ -119,7 +128,7 @@ export interface MyClaim {
   wishlist_id: string
   wishlist_name: string
   wishlist_owner: SimpleUser
-  participants: SimpleUser[]
+  participants: ClaimParticipant[]
   is_owner: boolean
   is_shared: boolean
 }

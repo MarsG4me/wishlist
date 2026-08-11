@@ -41,6 +41,8 @@ class UserServiceLocaleTest {
     private GroupWishlistShareRepository shareRepository;
     @Mock
     private KeycloakAccountClient keycloakAccountClient;
+    @Mock
+    private ClaimService claimService;
 
     private UserService userService;
 
@@ -51,7 +53,7 @@ class UserServiceLocaleTest {
     @BeforeEach
     void setUp() {
         userService = new UserService(userRepository, membershipRepository, shareRepository,
-                keycloakAccountClient);
+                keycloakAccountClient, claimService);
         user = new UserEntity(keycloakId, "Alice", "alice@test.local", UserLocale.EN);
     }
 

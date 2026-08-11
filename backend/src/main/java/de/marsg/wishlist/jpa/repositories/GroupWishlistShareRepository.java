@@ -14,6 +14,8 @@ public interface GroupWishlistShareRepository extends JpaRepository<GroupWishlis
 
     Page<GroupWishlistShareEntity> findByGroupsId(UUID groupsId, Pageable pageable);
 
+    List<GroupWishlistShareEntity> findByGroupsId(UUID groupsId);
+
     List<GroupWishlistShareEntity> findByWishlistsId(UUID wishlistsId);
 
     Optional<GroupWishlistShareEntity> findByGroupsIdAndWishlistsId(UUID groupsId, UUID wishlistsId);

@@ -116,6 +116,8 @@ export const uiDe: UiCatalogue = {
   'claims.wishlist': 'Wunschliste',
   'claims.wishlistWithOwner': '{name} ({owner})',
   'claims.togetherWith': 'Gemeinsam mit',
+  // Mitschenkende aus einer anderen Gruppe dieser Wunschliste bleiben namenlos
+  'claims.someoneElse': 'Jemand anderes',
   'claims.othersMayChipIn': 'Andere dürfen mitmachen',
   'claims.open': 'Offen',
   'claims.closed': 'Geschlossen',

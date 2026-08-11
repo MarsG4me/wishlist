@@ -46,10 +46,12 @@ public class GroupService {
     private final UserRepository userRepository;
     private final AccessService accessService;
     private final LimitService limitService;
+    private final ClaimService claimService;
 
     public GroupService(GroupRepository groupRepository, GroupMembershipRepository membershipRepository,
             GroupWishlistShareRepository shareRepository, WishlistRepository wishlistRepository,
-            UserRepository userRepository, AccessService accessService, LimitService limitService) {
+            UserRepository userRepository, AccessService accessService, LimitService limitService,
+            ClaimService claimService) {
         this.groupRepository = groupRepository;
         this.membershipRepository = membershipRepository;
         this.shareRepository = shareRepository;
@@ -57,6 +59,7 @@ public class GroupService {
         this.userRepository = userRepository;
         this.accessService = accessService;
         this.limitService = limitService;
+        this.claimService = claimService;
     }
 
     @Transactional(readOnly = true)
@@ -94,11 +97,17 @@ public class GroupService {
         return ReturnGroupDTO.from(group, true);
     }
 
+    /** Deleting the group ends every share it carried, so the claims behind them go too. */
     @Transactional
     public void softDelete(UUID userId, UUID groupId) {
         GroupEntity group = requireGroup(groupId);
         accessService.assertGroupAdmin(userId, group);
+        List<UUID> sharedWishlists = shareRepository.findByGroupsId(groupId).stream()
+                .map(GroupWishlistShareEntity::getWishlistsId)
+                .toList();
         group.markDeleted();
+        groupRepository.flush();
+        claimService.purgeParticipationsWithoutAccess(sharedWishlists);
         log.info("User {} soft-deleted group {}", userId, groupId);
     }
 
@@ -166,6 +175,9 @@ public class GroupService {
             accessService.assertGroupAdmin(userId, group);
         }
         shareRepository.delete(share);
+        shareRepository.flush();
+        // members of this group lose sight of the wishlist unless another share still covers it
+        claimService.purgeParticipationsWithoutAccess(List.of(wishlistId));
         log.info("User {} removed share of wishlist {} from group {}", userId, wishlistId, groupId);
     }
 

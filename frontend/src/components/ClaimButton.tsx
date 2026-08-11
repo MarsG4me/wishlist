@@ -32,7 +32,11 @@ export function ClaimControls({ wish, onChanged }: { wish: SharedWish; onChanged
       {wish.claims.map((claim) => (
         <div className="claim-row" key={claim.claim_id}>
           {claim.participants.map((participant) => (
-            <Chip key={participant.id} label={participant.displayname} icon="pi pi-gift" />
+            <Chip
+              key={participant.id}
+              label={participant.displayname ?? t('claims.someoneElse')}
+              icon="pi pi-gift"
+            />
           ))}
           {claim.is_shared && !claim.is_owner && (
             <Tag value={t('claims.openForOthers')} severity="info" />

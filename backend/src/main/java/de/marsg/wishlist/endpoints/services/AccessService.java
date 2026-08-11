@@ -62,4 +62,14 @@ public class AccessService {
         }
     }
 
+    /**
+     * Whether the requester may learn who this user is. A wishlist can be shared into
+     * several groups, so co-claimers are not automatically group mates — and identity is
+     * bound to the shared group everywhere else too (see {@code UserService#getOtherUser}).
+     */
+    public boolean mayIdentify(UUID requesterId, UUID otherId) {
+        return requesterId.equals(otherId)
+                || membershipRepository.existsGroupWithBothUsers(requesterId, otherId);
+    }
+
 }

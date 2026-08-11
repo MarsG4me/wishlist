@@ -115,6 +115,8 @@ export const uiEn = {
   'claims.wishlist': 'Wishlist',
   'claims.wishlistWithOwner': '{name} ({owner})',
   'claims.togetherWith': 'Together with',
+  // a claimer from another group of this wishlist: they are gifting, but not ours to name
+  'claims.someoneElse': 'Someone else',
   'claims.othersMayChipIn': 'Others may chip in',
   'claims.open': 'Open',
   'claims.closed': 'Closed',

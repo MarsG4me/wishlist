@@ -37,6 +37,8 @@ class MembershipServiceJoinTest {
     private GroupService groupService;
     @Mock
     private AccessService accessService;
+    @Mock
+    private ClaimService claimService;
 
     private MembershipService membershipService;
 
@@ -47,7 +49,7 @@ class MembershipServiceJoinTest {
     @BeforeEach
     void setUp() {
         membershipService = new MembershipService(membershipRepository, inviteRepository,
-                shareRepository, userRepository, groupService, accessService);
+                shareRepository, userRepository, groupService, accessService, claimService);
     }
 
     private GroupInviteEntity mockInvite(boolean revoked, boolean expired) {

@@ -549,6 +549,11 @@ class FullFlowIT {
         // carol (non-admin) leaves the group herself
         mvc.perform(delete("/v1/memberships/" + carolMembershipId).with(carol()))
                 .andExpect(status().isNoContent());
+        // her claims went with the membership: a claim must never outlive the access that
+        // made its wishlist visible, otherwise the overview keeps serving wish and owner
+        mvc.perform(get("/v1/claims").with(carol()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
         String memberships = perform(get("/v1/memberships").param("group_id", groupId).with(alice()), 200);
         String aliceMembershipId = JsonPath.read(memberships,
                 "$.items[?(@.is_owner == true)].id").toString().replaceAll("[\\[\\]\"]", "");

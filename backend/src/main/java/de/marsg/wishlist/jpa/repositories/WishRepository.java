@@ -2,6 +2,8 @@ package de.marsg.wishlist.jpa.repositories;
 
 import de.marsg.wishlist.jpa.entities.WishEntity;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -14,6 +16,8 @@ import org.springframework.data.repository.query.Param;
 public interface WishRepository extends JpaRepository<WishEntity, UUID> {
 
     Page<WishEntity> findByWishlistsId(UUID wishlistsId, Pageable pageable);
+
+    List<WishEntity> findByWishlistsIdIn(Collection<UUID> wishlistsIds);
 
     long countByWishlistsId(UUID wishlistsId);
 
