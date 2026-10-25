@@ -45,5 +45,13 @@ export const errorsDe: Record<string, string> = {
   INVALID_CREDENTIALS: 'Das aktuelle Passwort ist falsch.',
   KEYCLOAK_UPDATE_FAILED: 'Die Kontoänderung wurde abgelehnt. Bitte versuche es erneut.',
   ACCOUNT_DELETED: 'Dieses Konto wurde gelöscht.',
+  LINK_SHORTENER_NOT_ALLOWED: 'Link-Verkürzer sind nicht erlaubt. Nutze die vollständige Adresse.',
+  LINK_NOT_FOUND: 'Link nicht gefunden.',
+  LINK_ALREADY_REPORTED: 'Du hast diesen Link bereits gemeldet.',
+  CANNOT_REPORT_OWN_LINK: 'Du kannst deinen eigenen Link nicht melden.',
+  LINK_REPORT_NOT_FOUND: 'Meldung nicht gefunden.',
+  LINK_REPORT_ALREADY_DECIDED: 'Über diese Meldung wurde bereits entschieden.',
+  REPORT_NOT_ESCALATED: 'Diese Meldung wurde nicht eskaliert.',
+  BLOCKED_DOMAIN_NOT_FOUND: 'Gesperrte Domain nicht gefunden.',
   INTERNAL_ERROR: 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.',
 }

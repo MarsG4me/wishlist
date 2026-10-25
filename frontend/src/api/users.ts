@@ -1,7 +1,10 @@
 import { api, rethrowBlobError } from './client'
-import type { Locale, OwnUser, SimpleUser, UserTier } from './types'
+import type { Locale, Onboarding, OwnUser, SimpleUser, UserTier } from './types'
 
 export const getOwnUser = async (): Promise<OwnUser> => (await api.get('/v1/users/me')).data
+
+export const getOnboarding = async (): Promise<Onboarding> =>
+  (await api.get('/v1/users/me/onboarding')).data
 
 export const updateDisplayname = async (displayname: string): Promise<OwnUser> =>
   (await api.patch('/v1/users/me', { displayname })).data

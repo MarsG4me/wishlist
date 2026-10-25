@@ -63,7 +63,7 @@ wait_for "$KEYCLOAK_REALM_URL/.well-known/openid-configuration" "Keycloak" 90
 stop_apps
 
 log "Starting backend on $API_URL (log: $LOG_DIR/backend.log)"
-(cd backend && mvn -q spring-boot:run) > "$LOG_DIR/backend.log" 2>&1 &
+(cd backend && SPRING_PROFILES_ACTIVE=dev mvn -q spring-boot:run) > "$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
 if [[ ! -d frontend/node_modules ]]; then

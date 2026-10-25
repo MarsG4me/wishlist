@@ -1,9 +1,11 @@
 package de.marsg.wishlist.endpoints.services;
 
+import de.marsg.wishlist.endpoints.dto.users.ReturnOnboardingDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnOwnUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.jpa.entities.AdminAuditAction;
 import de.marsg.wishlist.jpa.entities.GroupWishlistShareEntity;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.entities.UserLocale;
@@ -11,13 +13,17 @@ import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
 import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
+import de.marsg.wishlist.jpa.repositories.WishRepository;
+import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class UserService {
@@ -30,10 +36,20 @@ public class UserService {
     private final KeycloakAccountClient keycloakAccountClient;
     private final ClaimService claimService;
     private final MembershipService membershipService;
+    private final WishlistRepository wishlistRepository;
+    private final WishRepository wishRepository;
+    private final AdminAuditService auditService;
+    private final TransactionTemplate transactionTemplate;
 
     public UserService(UserRepository userRepository, GroupMembershipRepository membershipRepository,
             GroupWishlistShareRepository shareRepository, KeycloakAccountClient keycloakAccountClient,
-            ClaimService claimService, MembershipService membershipService) {
+            ClaimService claimService, MembershipService membershipService,
+            WishlistRepository wishlistRepository, WishRepository wishRepository,
+            AdminAuditService auditService, TransactionTemplate transactionTemplate) {
+        this.wishlistRepository = wishlistRepository;
+        this.wishRepository = wishRepository;
+        this.auditService = auditService;
+        this.transactionTemplate = transactionTemplate;
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.shareRepository = shareRepository;
@@ -96,10 +112,18 @@ public class UserService {
         return ReturnOwnUserDTO.from(user, identityProvider);
     }
 
-    /** Verifies the current password, then resets via Keycloak Admin API. Nothing stored in our DB. */
-    public void updatePassword(UUID userId, String currentPassword, String newPassword) {
+    /** Verifies the current password, resets via Keycloak Admin API and ends the other sessions. Nothing stored in our DB. */
+    public void updatePassword(UUID userId, String keepSessionId, String currentPassword, String newPassword) {
         UserEntity user = requireUser(userId);
-        keycloakAccountClient.changePassword(user.getEmail(), currentPassword, user.getKeycloakId(), newPassword);
+        keycloakAccountClient.changePassword(user.getEmail(), currentPassword, user.getKeycloakId(), newPassword,
+                keepSessionId);
+    }
+
+    /** Counts for the onboarding card; soft-deleted wishlists, wishes and groups do not count. */
+    @Transactional(readOnly = true)
+    public ReturnOnboardingDTO getOnboarding(UUID userId) {
+        return new ReturnOnboardingDTO(wishlistRepository.countByUsersId(userId),
+                wishRepository.countInWishlistsOf(userId), membershipRepository.countInLiveGroups(userId));
     }
 
     @Transactional
@@ -107,22 +131,35 @@ public class UserService {
         softDelete(requireUser(userId));
     }
 
-    /**
-     * Immediate erasure: soft-delete cleanup, then the DB row (cascading wishlists, wishes
-     * and claims) and the Keycloak account. A Keycloak failure rolls everything back.
-     */
+    /** Admin soft delete; the audit row commits with the soft delete or not at all. */
     @Transactional
-    public void eraseUserNow(UUID userId) {
-        UserEntity user = userRepository.findByIdIncludingDeleted(userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
-        UUID keycloakId = user.getKeycloakId();
-        if (user.isDeleted()) {
-            releaseTies(userId);
-        } else {
-            softDelete(user);
-        }
-        userRepository.deleteHardById(userId);
+    public void softDeleteUserAudited(UUID adminId, UUID userId) {
+        softDelete(requireUser(userId));
+        auditService.record(adminId, AdminAuditAction.USER_DELETE, userId, null);
+    }
+
+    /**
+     * Immediate erasure in three steps, deliberately not one transaction: the soft delete
+     * commits first, then Keycloak, then the row. A failure leaves a soft-deleted user
+     * and a retry (an already deleted user, Keycloak 404 = success) finishes the job.
+     */
+    public void eraseUserNow(UUID adminId, UUID userId) {
+        UUID keycloakId = transactionTemplate.execute(status -> {
+            UserEntity user = userRepository.findByIdIncludingDeleted(userId)
+                    .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+            if (user.isDeleted()) {
+                releaseTies(userId);
+            } else {
+                softDelete(user);
+                auditService.record(adminId, AdminAuditAction.USER_DELETE_IMMEDIATE, userId, Map.of("step", "soft"));
+            }
+            return user.getKeycloakId();
+        });
         keycloakAccountClient.deleteUser(keycloakId);
+        transactionTemplate.executeWithoutResult(status -> {
+            userRepository.deleteHardById(userId);
+            auditService.record(adminId, AdminAuditAction.USER_DELETE_IMMEDIATE, userId, null);
+        });
         log.info("Erased user {}", userId);
     }
 
@@ -165,11 +202,12 @@ public class UserService {
     }
 
     @Transactional
-    public ReturnOwnUserDTO setTier(UUID targetId, UserTier tier) {
+    public ReturnOwnUserDTO setTier(UUID adminId, UUID targetId, UserTier tier) {
         UserEntity target = userRepository.findById(targetId)
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
         target.setTier(tier);
         log.info("Set tier of user {} to {}", targetId, tier);
+        auditService.record(adminId, AdminAuditAction.TIER_CHANGE, targetId, Map.of("tier", tier.name()));
         // admin response: the target's login method is none of the admin's business
         return ReturnOwnUserDTO.from(target, null);
     }

@@ -21,7 +21,7 @@ public record ReturnSharedWishDTO(
         @JsonProperty("description") String description,
         @JsonProperty("quantity") Integer quantity,
         @JsonProperty("remaining") Integer remaining,
-        @JsonProperty("links") List<WishLinkDTO> links,
+        @JsonProperty("links") List<ReturnWishLinkDTO> links,
         @JsonProperty("claims") List<ReturnWishClaimDTO> claims,
         @JsonProperty("can_claim") boolean canClaim) {
 
@@ -37,6 +37,7 @@ public record ReturnSharedWishDTO(
                 .toList();
         return new ReturnSharedWishDTO(wish.getId(), wish.getWishlistsId(), wish.getName(),
                 wish.getDescription(), wish.getQuantity(), remaining,
-                wish.getLinks().stream().map(WishLinkDTO::from).toList(), resolved, canClaim);
+                wish.getLinks().stream().filter(link -> !link.isBlocked()).map(ReturnWishLinkDTO::from).toList(),
+                resolved, canClaim);
     }
 }

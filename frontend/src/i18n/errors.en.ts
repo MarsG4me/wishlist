@@ -44,5 +44,13 @@ export const errorsEn: Record<string, string> = {
   INVALID_CREDENTIALS: 'The current password is incorrect.',
   KEYCLOAK_UPDATE_FAILED: 'The account update was rejected. Please try again.',
   ACCOUNT_DELETED: 'This account has been deleted.',
+  LINK_SHORTENER_NOT_ALLOWED: 'Link shorteners are not allowed. Use the full address.',
+  LINK_NOT_FOUND: 'Link not found.',
+  LINK_ALREADY_REPORTED: 'You already reported this link.',
+  CANNOT_REPORT_OWN_LINK: 'You cannot report your own link.',
+  LINK_REPORT_NOT_FOUND: 'Report not found.',
+  LINK_REPORT_ALREADY_DECIDED: 'This report was already decided.',
+  REPORT_NOT_ESCALATED: 'This report was not escalated.',
+  BLOCKED_DOMAIN_NOT_FOUND: 'Blocked domain not found.',
   INTERNAL_ERROR: 'Something went wrong. Please try again later.',
 }

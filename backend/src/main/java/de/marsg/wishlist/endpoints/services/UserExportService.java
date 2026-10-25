@@ -7,6 +7,7 @@ import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportGroup;
 import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportInvite;
 import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportKeycloak;
 import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportLink;
+import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportLinkReport;
 import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportMembership;
 import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportShare;
 import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO.ExportUser;
@@ -63,7 +64,11 @@ public class UserExportService {
                         .map(row -> new ExportShare((UUID) row[0], (UUID) row[1])).toList(),
                 exportRepository.findClaimRows(userId).stream()
                         .map(row -> new ExportClaim((UUID) row[0], (String) row[1], (String) row[2],
-                                (Boolean) row[3], userId.equals(row[4]))).toList());
+                                (Boolean) row[3], userId.equals(row[4]))).toList(),
+                exportRepository.findLinkReportRows(userId).stream()
+                        .map(row -> new ExportLinkReport((UUID) row[0], (String) row[1], (String) row[2],
+                                (String) row[3], (String) row[4], UuidV7Factory.timestampOf((UUID) row[0])))
+                        .toList());
     }
 
     /** Null when Keycloak cannot be reached: the export of our own data must not depend on it. */
@@ -105,7 +110,7 @@ public class UserExportService {
     }
 
     /** Native timestamptz columns arrive as Instant, OffsetDateTime or Timestamp depending on the driver path. */
-    private static Instant instantOf(Object value) {
+    static Instant instantOf(Object value) {
         return switch (value) {
             case null -> null;
             case Instant instant -> instant;

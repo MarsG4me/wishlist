@@ -69,7 +69,7 @@ export function SharedWishlistPage() {
             />
             <div className="wish-card-links">
               {wish.links.map((link) => (
-                <WishLink key={link.url} url={link.url} label={link.label} />
+                <WishLink key={link.id ?? link.url} link={link} reportable={'claims' in wish} />
               ))}
             </div>
             <ClaimControls wish={wish} onChanged={list.reload} />

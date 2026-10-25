@@ -6,7 +6,9 @@ import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
 import type { OwnWish, WishLink } from '../api/types'
 import type { WishInput } from '../api/wishes'
-import { useT } from '../i18n'
+import { ApiError } from '../api/errors'
+import { tError, useT } from '../i18n'
+import type { UiKey } from '../i18n/ui.en'
 
 interface Props {
   visible: boolean
@@ -42,18 +44,22 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
   const [unlimited, setUnlimited] = useState(false)
   const [links, setLinks] = useState<WishLink[]>([])
   const [saving, setSaving] = useState(false)
+  const [serverError, setServerError] = useState<{ index: number; code: string } | null>(null)
   const t = useT()
 
   useEffect(() => {
     if (!visible) return
+    setServerError(null)
     setName(wish?.name ?? '')
     setDescription(wish?.description ?? '')
     setUnlimited(wish ? wish.quantity === null : false)
     setLinks(wish?.links ?? [])
   }, [visible, wish])
 
-  const setLink = (index: number, patch: Partial<WishLink>) =>
+  const setLink = (index: number, patch: Partial<WishLink>) => {
+    setServerError(null)
     setLinks(links.map((link, i) => (i === index ? { ...link, ...patch } : link)))
+  }
 
   const linkErrors = links.map((link) => linkError(link.url, t))
   const invalid = linkErrors.some(Boolean)
@@ -61,16 +67,22 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
   const save = async () => {
     if (invalid) return
     setSaving(true)
+    setServerError(null)
+    // the backend's link_index counts the sent links, i.e. without the blank rows
+    const sentIndexes = links.flatMap((link, i) => (link.url.trim() !== '' ? [i] : []))
     try {
       await onSave({
         name,
         description: description || null,
         quantity: unlimited ? null : 1,
-        links: links
-          .filter((link) => link.url.trim() !== '')
-          .map((link) => ({ ...link, url: normalizeUrl(link.url) })),
+        links: sentIndexes.map((i) => ({ url: normalizeUrl(links[i].url), label: links[i].label })),
       })
       onHide()
+    } catch (e) {
+      if (e instanceof ApiError && e.linkIndex !== undefined && sentIndexes[e.linkIndex] !== undefined) {
+        setServerError({ index: sentIndexes[e.linkIndex], code: e.errorCode })
+      }
+      // callers already toasted; the dialog stays open
     } finally {
       setSaving(false)
     }
@@ -114,7 +126,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
               placeholder="https://…"
               value={link.url}
               invalid={!!linkErrors[i]}
-              onChange={(e) => setLink(i, { url: e.target.value })}
+              onChange={(e) => setLink(i, { url: e.target.value, blocked: false })}
             />
             <InputText
               placeholder={t('wishes.linkLabel')}
@@ -128,6 +140,15 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
               onClick={() => setLinks(links.filter((_, j) => j !== i))}
             />
             {linkErrors[i] && <small className="p-error" style={{ flexBasis: '100%' }}>{linkErrors[i]}</small>}
+            {serverError?.index === i && (
+              <small className="p-error" style={{ flexBasis: '100%' }}>{tError(serverError.code)}</small>
+            )}
+            {link.blocked && (
+              <small className="p-error" style={{ flexBasis: '100%' }}>
+                <i className="pi pi-ban" /> {t('links.blocked')}
+                {link.blocked_by && ` — ${t(`links.blockedBy.${link.blocked_by}` as UiKey)}`}
+              </small>
+            )}
           </div>
         ))}
         <Button

@@ -57,6 +57,14 @@ public interface UserExportRepository extends Repository<UserEntity, UUID> {
     @Query("SELECT i FROM GroupInviteEntity i WHERE i.usersId = :userId")
     List<GroupInviteEntity> findInvitesCreatedBy(@Param("userId") UUID userId);
 
+    /** Rows of {report id, reason, comment, status, link url or null once the link is gone} the user filed. */
+    @Query(value = """
+            SELECT r.id, CAST(r.reason AS text), r.comment, CAST(r.status AS text), k.url
+            FROM link_reports r LEFT JOIN wish_links k ON k.id = r.wish_links_id
+            WHERE r.users_id = :userId ORDER BY r.id
+            """, nativeQuery = true)
+    List<Object[]> findLinkReportRows(@Param("userId") UUID userId);
+
     /** Rows of {claim id, wish name, owner displayname or null, is_shared, claim creator id}, deleted wishes included. */
     @Query(value = """
             SELECT c.id, w.name, o.displayname, c.is_shared, c.users_id

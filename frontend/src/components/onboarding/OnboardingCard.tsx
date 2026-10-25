@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
-import { listGroups } from '../../api/groups'
-import { listWishes } from '../../api/wishes'
+import { getOnboarding } from '../../api/users'
 import { listWishlists } from '../../api/wishlists'
+import type { Onboarding } from '../../api/types'
 import { useT } from '../../i18n'
 
 const DISMISS_KEY = 'wishlist.onboarding.dismissed'
@@ -25,33 +25,25 @@ interface Props {
 
 /**
  * First-run guide: create a wishlist, add a wish, share via a group. Progress comes from
- * backend totals only (limit=1 queries); compact and dismissible once a wishlist exists.
+ * the backend onboarding counts; compact and dismissible once a wishlist exists.
  */
 export function OnboardingCard({ wishlistTotal, onCreateWishlist }: Props) {
   const t = useT()
   const navigate = useNavigate()
   const [wishlistId, setWishlistId] = useState<string | null>(null)
-  const [wishTotal, setWishTotal] = useState(0)
-  const [groupTotal, setGroupTotal] = useState(0)
+  const [counts, setCounts] = useState<Onboarding | null>(null)
   const [dismissed, setDismissed] = useState(readDismissed)
 
   useEffect(() => {
     let cancelled = false
-    listGroups({ limit: 1 })
-      .then((page) => !cancelled && setGroupTotal(page.total))
+    getOnboarding()
+      .then((c) => !cancelled && setCounts(c))
       .catch(() => {})
     if (wishlistTotal === 0) {
       setWishlistId(null)
-      setWishTotal(0)
     } else {
       listWishlists({ limit: 1 })
-        .then(async (page) => {
-          const first = page.items[0]
-          if (!first || cancelled) return
-          setWishlistId(first.id)
-          const wishes = await listWishes(first.id, { limit: 1 })
-          if (!cancelled) setWishTotal(wishes.total)
-        })
+        .then((page) => !cancelled && setWishlistId(page.items[0]?.id ?? null))
         .catch(() => {})
     }
     return () => {
@@ -59,9 +51,10 @@ export function OnboardingCard({ wishlistTotal, onCreateWishlist }: Props) {
     }
   }, [wishlistTotal])
 
-  const done = [wishlistTotal > 0, wishTotal > 0, groupTotal > 0]
+  const ownWishlists = counts?.wishlist_total ?? wishlistTotal
+  const done = [ownWishlists > 0, (counts?.wish_total ?? 0) > 0, (counts?.group_total ?? 0) > 0]
   const doneCount = done.filter(Boolean).length
-  const compact = wishlistTotal > 0
+  const compact = ownWishlists > 0
   if (doneCount === 3 || (compact && dismissed)) return null
 
   const dismiss = () => {

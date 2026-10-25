@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.SoftDeletePurgeJob;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.entities.UserLocale;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** A soft-deleted account is only restored by a login that happened after the deletion. */
 @ExtendWith(MockitoExtension.class)
@@ -87,6 +89,19 @@ class UserProvisioningRestoreTest {
 
         assertThat(result.isDeleted()).isFalse();
         verify(userRepository).save(deleted);
+    }
+
+    @Test
+    void freshLoginAfterTheRetentionWindowIsRejected() {
+        ReflectionTestUtils.setField(deleted, "deletedAt",
+                Instant.now().minus(SoftDeletePurgeJob.RETENTION).minusSeconds(60));
+        withDeletedRow();
+
+        assertThatThrownBy(() -> service.provision(jwt(Instant.now())))
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCOUNT_DELETED));
+        assertThat(deleted.isDeleted()).isTrue();
+        verify(userRepository, never()).save(any());
     }
 
     @Test

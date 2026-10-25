@@ -55,6 +55,15 @@ public enum ErrorCode {
 
     INVALID_LINK_URL(HttpStatus.BAD_REQUEST, "The link must be a public http or https URL"),
     LINK_BLOCKED(HttpStatus.UNPROCESSABLE_ENTITY, "This link was blocked by our safety checks"),
+    LINK_SHORTENER_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_ENTITY,
+            "Link shortener URLs are not accepted; use the full address"),
+    LINK_NOT_FOUND(HttpStatus.NOT_FOUND, "Link not found"),
+    LINK_ALREADY_REPORTED(HttpStatus.CONFLICT, "You already reported this link"),
+    CANNOT_REPORT_OWN_LINK(HttpStatus.FORBIDDEN, "You cannot report your own link"),
+    LINK_REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "Link report not found"),
+    LINK_REPORT_ALREADY_DECIDED(HttpStatus.CONFLICT, "This report was already decided"),
+    REPORT_NOT_ESCALATED(HttpStatus.CONFLICT, "Only escalated reports have an authority report"),
+    BLOCKED_DOMAIN_NOT_FOUND(HttpStatus.NOT_FOUND, "Blocked domain not found"),
 
     CLAIM_NOT_FOUND(HttpStatus.NOT_FOUND, "Claim not found"),
     CANNOT_CLAIM_OWN_WISH(HttpStatus.FORBIDDEN, "You cannot claim your own wish"),

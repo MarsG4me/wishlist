@@ -72,6 +72,8 @@ jobs:
 
       - name: Start backend
         working-directory: backend
+        env:
+          SPRING_PROFILES_ACTIVE: dev
         run: |
           nohup mvn -B spring-boot:run > /tmp/backend.log 2>&1 &
           for i in $(seq 1 60); do

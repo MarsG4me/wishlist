@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,6 +17,8 @@ import de.marsg.wishlist.jpa.entities.UserLocale;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
 import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
+import de.marsg.wishlist.jpa.repositories.WishRepository;
+import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.assertj.core.api.Assertions;
@@ -24,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Language changes go through our backend (the Account API answered 401 for the app's
@@ -55,7 +59,9 @@ class UserServiceLocaleTest {
     @BeforeEach
     void setUp() {
         userService = new UserService(userRepository, membershipRepository, shareRepository,
-                keycloakAccountClient, claimService, membershipService);
+                keycloakAccountClient, claimService, membershipService,
+                mock(WishlistRepository.class), mock(WishRepository.class), mock(AdminAuditService.class),
+                mock(TransactionTemplate.class));
         user = new UserEntity(keycloakId, "Alice", "alice@test.local", UserLocale.EN);
     }
 

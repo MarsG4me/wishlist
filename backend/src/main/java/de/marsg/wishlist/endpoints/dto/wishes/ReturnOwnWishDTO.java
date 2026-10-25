@@ -15,11 +15,11 @@ public record ReturnOwnWishDTO(
         @JsonProperty("name") String name,
         @JsonProperty("description") String description,
         @JsonProperty("quantity") Integer quantity,
-        @JsonProperty("links") List<WishLinkDTO> links) {
+        @JsonProperty("links") List<ReturnOwnWishLinkDTO> links) {
 
     public static ReturnOwnWishDTO from(WishEntity wish) {
         return new ReturnOwnWishDTO(wish.getId(), wish.getWishlistsId(), wish.getName(),
                 wish.getDescription(), wish.getQuantity(),
-                wish.getLinks().stream().map(WishLinkDTO::from).toList());
+                wish.getLinks().stream().map(ReturnOwnWishLinkDTO::from).toList());
     }
 }

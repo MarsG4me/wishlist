@@ -17,7 +17,18 @@ public record ReturnUserExportDTO(
         @JsonProperty("groups_created") List<ExportGroup> groupsCreated,
         @JsonProperty("invites_created") List<ExportInvite> invitesCreated,
         @JsonProperty("shares") List<ExportShare> shares,
-        @JsonProperty("claims") List<ExportClaim> claims) {
+        @JsonProperty("claims") List<ExportClaim> claims,
+        @JsonProperty("link_reports") List<ExportLinkReport> linkReports) {
+
+    /** A link report the user filed; the link url is null once the link is gone. */
+    public record ExportLinkReport(
+            @JsonProperty("report_id") UUID reportId,
+            @JsonProperty("reason") String reason,
+            @JsonProperty("comment") String comment,
+            @JsonProperty("status") String status,
+            @JsonProperty("url") String url,
+            @JsonProperty("reported_at") Instant reportedAt) {
+    }
 
     public record ExportUser(
             @JsonProperty("id") UUID id,

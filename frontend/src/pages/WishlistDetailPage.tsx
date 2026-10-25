@@ -67,7 +67,8 @@ export function WishlistDetailPage() {
       showSuccess(t('common.saved'))
       reload()
     } catch (e) {
-      showError(e)
+      // a link error is shown inline in the form instead
+      if (!(e instanceof ApiError && e.linkIndex !== undefined)) showError(e)
       throw e
     }
   }
@@ -154,7 +155,7 @@ export function WishlistDetailPage() {
             />
             <div className="wish-card-links">
               {wish.links.map((link, i) => (
-                <WishLink key={i} url={link.url} label={link.label} />
+                <WishLink key={i} link={link} />
               ))}
             </div>
           </Card>

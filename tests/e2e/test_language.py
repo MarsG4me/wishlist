@@ -3,13 +3,17 @@
 straight to the Keycloak Account API, which answered 401 for the app token.
 """
 
+import re
+
 from playwright.sync_api import Page, expect
 
 PROFILE_URL = "http://localhost:5173/profile"
+# the card title flips to German as soon as the choice is applied
+CARD_TEXT = re.compile("Language|Sprache")
 
 
 def pick_language(page: Page, label: str) -> None:
-    card = page.locator(".p-card", has_text="Language")
+    card = page.locator(".p-card", has_text=CARD_TEXT)
     card.locator(".p-dropdown").click()
     # PrimeReact renders the options in an overlay panel, not in the native select
     page.locator(".p-dropdown-panel .p-dropdown-item", has_text=label).click()
@@ -29,18 +33,19 @@ def test_language_change_is_saved_by_our_backend(as_user):
     assert response.json()["locale"] == "DE"
 
     # success toast, not the error one the 401 used to produce
-    expect(carol.locator(".p-toast-message", has_text="Language saved")).to_be_visible()
+    expect(carol.locator(".p-toast-message", has_text="Sprache gespeichert")).to_be_visible()
     expect(carol.locator(".p-toast-message-error")).to_have_count(0)
 
     # the account setting, not a browser guess: it is still there after a reload
     carol.reload()
-    expect(carol.locator(".p-card", has_text="Language").locator(".p-dropdown-label")).to_have_text(
+    expect(carol.locator(".p-card", has_text=CARD_TEXT).locator(".p-dropdown-label")).to_have_text(
         "Deutsch"
     )
 
     # back to English so repeated runs stay idempotent
     expect(carol.locator(".p-toast-message")).to_have_count(0)
     pick_language(carol, "English")
+    expect(carol.locator(".p-toast-message", has_text="Language saved")).to_be_visible()
 
 
 def test_language_is_settable_without_keycloak_account_permissions(as_user):
@@ -54,7 +59,7 @@ def test_language_is_settable_without_keycloak_account_permissions(as_user):
 
     bob.goto("http://localhost:5173/")
     bob.goto(PROFILE_URL)
-    expect(bob.locator(".p-card", has_text="Language").locator(".p-dropdown-label")).to_have_text(
+    expect(bob.locator(".p-card", has_text=CARD_TEXT).locator(".p-dropdown-label")).to_have_text(
         "Deutsch"
     )
 

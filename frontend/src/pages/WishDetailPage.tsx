@@ -53,7 +53,8 @@ export function WishDetailPage() {
       showSuccess(t('common.saved'))
       reload()
     } catch (e) {
-      showError(e)
+      // a link error is shown inline in the form instead
+      if (!(e instanceof ApiError && e.linkIndex !== undefined)) showError(e)
       throw e
     }
   }
@@ -126,7 +127,7 @@ export function WishDetailPage() {
         />
         <div className="wish-card-links">
           {wish.links.map((link) => (
-            <WishLink key={link.url} url={link.url} label={link.label} />
+            <WishLink key={link.id ?? link.url} link={link} reportable={!owned} />
           ))}
         </div>
         {isShared(wish) && <ClaimControls wish={wish} onChanged={reload} />}

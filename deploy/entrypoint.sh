@@ -1,5 +1,5 @@
 #!/bin/sh
-# Renders the two things that cannot be baked into the image — the SPA's runtime config
+# Renders what cannot be baked into the image — the SPA's runtime config, the CSP header
 # and nginx's trusted-proxy list — then hands over to supervisord (nginx + backend).
 set -eu
 
@@ -24,7 +24,8 @@ js_string() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
-cat > /srv/www/config.js <<EOF
+# /srv/www is read-only for the app user, so the runtime config lives in /tmp/nginx
+cat > /tmp/nginx/config.js <<EOF
 window.__WISHLIST_CONFIG__ = {
   apiUrl: "$(js_string "$PUBLIC_API_URL")",
   keycloakUrl: "$(js_string "$KEYCLOAK_URL")",
@@ -33,6 +34,21 @@ window.__WISHLIST_CONFIG__ = {
   adsEnabled: $ADS_ENABLED
 };
 EOF
+
+# scheme://host[:port] of a URL; refuses anything that could break out of the CSP header
+origin_of() {
+  printf '%s' "$2" | grep -Eq '^https?://[A-Za-z0-9.-]+(:[0-9]+)?(/[^"; ]*)?$' \
+    || fail "$1 must be an http(s) URL without quotes, semicolons or spaces, got '$2'"
+  printf '%s' "$2" | sed -E 's#^(https?://[^/]+).*#\1#'
+}
+
+KC_ORIGIN=$(origin_of KEYCLOAK_URL "$KEYCLOAK_URL")
+CONNECT="'self' $KC_ORIGIN"
+if [ -n "$PUBLIC_API_URL" ]; then
+  CONNECT="$CONNECT $(origin_of PUBLIC_API_URL "$PUBLIC_API_URL")"
+fi
+# ADS_ENABLED adds no ad domains yet: the frontend loads no ad scripts (AdSlot is a stub)
+echo "add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src $CONNECT; frame-src $KC_ORIGIN; frame-ancestors 'none'; base-uri 'self'; form-action 'self' $KC_ORIGIN\" always;" > /tmp/nginx/csp.conf
 
 # TRUSTED_PROXY_CIDR: whitespace- or comma-separated list of the outer nginx addresses.
 : > /tmp/nginx/real_ip.conf

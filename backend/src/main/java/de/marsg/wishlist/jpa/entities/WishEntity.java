@@ -10,6 +10,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.hibernate.annotations.SQLRestriction;
@@ -87,8 +88,23 @@ public class WishEntity extends SoftDeletable {
         return links;
     }
 
+    /** Keeps the row (and id) of every link whose URL is resubmitted, matching duplicates in order. */
     public void replaceLinks(List<WishLinkEntity> newLinks) {
-        links.clear();
-        links.addAll(newLinks);
+        List<WishLinkEntity> unused = new ArrayList<>(links);
+        List<WishLinkEntity> result = new ArrayList<>(newLinks.size());
+        for (WishLinkEntity submitted : newLinks) {
+            WishLinkEntity existing = unused.stream().filter(l -> l.getUrl().equals(submitted.getUrl()))
+                    .findFirst().orElse(null);
+            if (existing == null) {
+                result.add(submitted);
+            } else {
+                unused.remove(existing);
+                existing.updateFrom(submitted);
+                result.add(existing);
+            }
+        }
+        links.removeIf(l -> !result.contains(l));
+        result.stream().filter(l -> !links.contains(l)).forEach(links::add);
+        links.sort(Comparator.comparingInt(WishLinkEntity::getPosition));
     }
 }

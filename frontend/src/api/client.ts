@@ -20,7 +20,7 @@ api.interceptors.response.use(
   (error) => {
     const data = error.response?.data
     if (data?.error_code) {
-      throw new ApiError(data.error_code, data.message, error.response.status)
+      throw new ApiError(data.error_code, data.message, error.response.status, data.link_index ?? undefined)
     }
     throw error
   },
@@ -32,7 +32,7 @@ export const rethrowBlobError = async (error: unknown): Promise<never> => {
   if (res?.data instanceof Blob) {
     try {
       const data = JSON.parse(await res.data.text())
-      if (data?.error_code) throw new ApiError(data.error_code, data.message, res.status)
+      if (data?.error_code) throw new ApiError(data.error_code, data.message, res.status, data.link_index ?? undefined)
     } catch (e) {
       if (e instanceof ApiError) throw e
     }

@@ -207,10 +207,86 @@ public class KeycloakAccountClient {
      * Changes the password: rejects with INVALID_CREDENTIALS when the current password
      * does not authenticate, then resets via the Admin API.
      */
-    public void changePassword(String email, String currentPassword, UUID keycloakId, String newPassword) {
+    public void changePassword(String email, String currentPassword, UUID keycloakId, String newPassword,
+            String keepSid) {
         verifyCurrentPassword(email, currentPassword);
         resetPassword(keycloakId, newPassword);
         log.info("Password changed for keycloak user {}", keycloakId);
+        logoutOtherSessions(keycloakId, keepSid);
+        revokeOfflineTokens(keycloakId);
+    }
+
+    /**
+     * Revokes the user's offline tokens for every client that holds one (GET consents lists them
+     * as additionalGrants, DELETE consents/{clientId} revokes). Best effort: failures are logged.
+     */
+    public void revokeOfflineTokens(UUID keycloakId) {
+        try {
+            String token = serviceAccountToken();
+            List<?> consents = restClient.get()
+                    .uri("/admin/realms/{realm}/users/{id}/consents", realm, keycloakId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .body(List.class);
+            for (Object consent : consents == null ? List.of() : consents) {
+                if (consent instanceof Map<?, ?> c && c.get("clientId") != null && holdsOfflineToken(c)) {
+                    revokeOfflineToken(token, keycloakId, c.get("clientId").toString());
+                }
+            }
+        } catch (RestClientException e) {
+            log.warn("Offline tokens of keycloak user {} not revoked: {}", keycloakId, statusOf(e));
+        } catch (ApiException e) {
+            log.warn("Offline tokens of keycloak user {} not revoked: no service token", keycloakId);
+        }
+    }
+
+    private static boolean holdsOfflineToken(Map<?, ?> consent) {
+        return consent.get("additionalGrants") instanceof List<?> grants
+                && grants.stream().anyMatch(g -> g instanceof Map<?, ?> m && "Offline Token".equals(m.get("key")));
+    }
+
+    private void revokeOfflineToken(String token, UUID keycloakId, String clientId) {
+        try {
+            restClient.delete()
+                    .uri("/admin/realms/{realm}/users/{id}/consents/{client}", realm, keycloakId, clientId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException e) {
+            log.warn("Offline token of keycloak user {} for a client not revoked: {}", keycloakId, statusOf(e));
+        }
+    }
+
+    /**
+     * Ends every session of the user except {@code keepSid}. Best effort: the password is
+     * already changed, so a failure is logged and swallowed. Without a sid nothing is ended.
+     */
+    public void logoutOtherSessions(UUID keycloakId, String keepSid) {
+        if (keepSid == null || keepSid.isBlank()) {
+            log.warn("No sid in the token of keycloak user {}; other sessions not ended", keycloakId);
+            return;
+        }
+        try {
+            String token = serviceAccountToken();
+            List<?> sessions = restClient.get()
+                    .uri("/admin/realms/{realm}/users/{id}/sessions", realm, keycloakId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .body(List.class);
+            for (Object session : sessions == null ? List.of() : sessions) {
+                if (session instanceof Map<?, ?> s && s.get("id") != null && !keepSid.equals(s.get("id"))) {
+                    restClient.delete()
+                            .uri("/admin/realms/{realm}/sessions/{sid}", realm, s.get("id"))
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                            .retrieve()
+                            .toBodilessEntity();
+                }
+            }
+        } catch (RestClientException e) {
+            log.warn("Other sessions of keycloak user {} not ended: {}", keycloakId, statusOf(e));
+        } catch (ApiException e) {
+            log.warn("Other sessions of keycloak user {} not ended: no service token", keycloakId);
+        }
     }
 
     /** Direct-grant login with the given password; INVALID_CREDENTIALS when it does not authenticate. */

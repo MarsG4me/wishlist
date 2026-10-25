@@ -47,9 +47,19 @@ export interface Wishlist {
   name: string
 }
 
-export interface WishLink {
+/** Link as sent in create/edit requests. */
+export interface WishLinkInput {
   url: string
   label: string | null
+}
+
+export type LinkBlockedBy = 'BLOCKLIST' | 'WEB_RISK' | 'SHORTENER' | 'ADMIN' | 'ADMIN_DOMAIN'
+
+/** Link as returned; blocked/blocked_by are present in owner views only. */
+export interface WishLink extends WishLinkInput {
+  id?: string
+  blocked?: boolean
+  blocked_by?: LinkBlockedBy | null
 }
 
 /** Owner view: structurally free of claim data. */
@@ -88,9 +98,15 @@ export interface UpdatedWish {
   existing_claims_affected: boolean
 }
 
+export interface Onboarding {
+  wishlist_total: number
+  wish_total: number
+  group_total: number
+}
+
 export interface Group {
   id: string
-  user_id: string
+  user_id: string | null
   name: string
   description: string | null
   /** The requester's own permission, decided by the backend — never derived from lists. */

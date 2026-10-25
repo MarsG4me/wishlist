@@ -1,6 +1,7 @@
 package de.marsg.wishlist.endpoints.controller;
 
 import de.marsg.wishlist.configs.security.AuthenticatedUser;
+import de.marsg.wishlist.endpoints.dto.users.ReturnOnboardingDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnOwnUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateEmailDTO;
@@ -74,10 +75,10 @@ public class UserController {
     @PatchMapping("/me/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Change password in-app: current password verified, then reset in Keycloak. "
-            + "Rejected for accounts signing in through an external provider")
+            + "Other sessions are logged out, the current one is kept. Rejected for accounts signing in through an external provider")
     public void updatePassword(AuthenticatedUser user, @Valid @RequestBody UpdatePasswordDTO body) {
         assertLocalAccount(user);
-        userService.updatePassword(user.userId(), body.currentPassword(), body.newPassword());
+        userService.updatePassword(user.userId(), user.sessionId(), body.currentPassword(), body.newPassword());
     }
 
     /** Google/Apple accounts have no credentials here — the provider owns them. */
@@ -103,6 +104,12 @@ public class UserController {
                 .body(exportService.export(user.userId()));
     }
 
+    @GetMapping("/me/onboarding")
+    @Operation(summary = "Counts driving the onboarding card: own wishlists, wishes in them, group memberships")
+    public ReturnOnboardingDTO getOnboarding(AuthenticatedUser user) {
+        return userService.getOnboarding(user.userId());
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Another user's public info; requires a common group")
     public ReturnSimpleUserDTO getUser(AuthenticatedUser user, @PathVariable("id") UUID id) {
@@ -112,7 +119,8 @@ public class UserController {
     @PatchMapping("/{id}/tier")
     @PreAuthorize("hasRole('admin')")
     @Operation(summary = "Set a user's tier (admin only)")
-    public ReturnOwnUserDTO setTier(@PathVariable("id") UUID id, @Valid @RequestBody UpdateTierDTO body) {
-        return userService.setTier(id, body.tier());
+    public ReturnOwnUserDTO setTier(AuthenticatedUser admin, @PathVariable("id") UUID id,
+            @Valid @RequestBody UpdateTierDTO body) {
+        return userService.setTier(admin.userId(), id, body.tier());
     }
 }

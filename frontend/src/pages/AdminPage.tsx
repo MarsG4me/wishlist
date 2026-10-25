@@ -15,6 +15,7 @@ import {
   searchAdminUsers,
   type AdminUserDeletable,
 } from '../api/adminDsgvo'
+import { AdminLinkReports } from './AdminLinkReports'
 import { PageHeader } from '../components/PageStates'
 import { setTier } from '../api/users'
 import type { UserTier } from '../api/types'
@@ -169,6 +170,7 @@ export function AdminPage() {
           </DataTable>
         )}
       </Card>
+      <AdminLinkReports />
       <Dialog
         header={t('admin.deleteHeader')}
         visible={target !== null}

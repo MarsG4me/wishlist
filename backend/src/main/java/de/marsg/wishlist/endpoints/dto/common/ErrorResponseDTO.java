@@ -1,5 +1,6 @@
 package de.marsg.wishlist.endpoints.dto.common;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.marsg.wishlist.helpers.ErrorCode;
 
@@ -9,13 +10,18 @@ import de.marsg.wishlist.helpers.ErrorCode;
  */
 public record ErrorResponseDTO(
         @JsonProperty("error_code") String errorCode,
-        @JsonProperty("message") String message) {
+        @JsonProperty("message") String message,
+        @JsonProperty("link_index") @JsonInclude(JsonInclude.Include.NON_NULL) Integer linkIndex) {
 
     public static ErrorResponseDTO of(ErrorCode code) {
-        return new ErrorResponseDTO(code.name(), code.getMessage());
+        return new ErrorResponseDTO(code.name(), code.getMessage(), null);
     }
 
     public static ErrorResponseDTO of(ErrorCode code, String message) {
-        return new ErrorResponseDTO(code.name(), message);
+        return new ErrorResponseDTO(code.name(), message, null);
+    }
+
+    public static ErrorResponseDTO of(ErrorCode code, String message, Integer linkIndex) {
+        return new ErrorResponseDTO(code.name(), message, linkIndex);
     }
 }

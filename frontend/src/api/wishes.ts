@@ -1,11 +1,11 @@
 import { api } from './client'
-import type { ListResponse, OwnWish, PageQuery, SharedWish, UpdatedWish, WishLink } from './types'
+import type { ListResponse, OwnWish, PageQuery, SharedWish, UpdatedWish, WishLinkInput } from './types'
 
 export interface WishInput {
   name: string
   description: string | null
   quantity: number | null
-  links: WishLink[]
+  links: WishLinkInput[]
 }
 
 /** Owner gets OwnWish items; group members get SharedWish items (with claims). */

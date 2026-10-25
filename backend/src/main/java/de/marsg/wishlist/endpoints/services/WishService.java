@@ -20,6 +20,7 @@ import de.marsg.wishlist.jpa.entities.WishlistEntity;
 import de.marsg.wishlist.jpa.repositories.ClaimParticipantRepository;
 import de.marsg.wishlist.jpa.repositories.ClaimRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -194,16 +196,32 @@ public class WishService {
         return result;
     }
 
-    /** Normalizes and safety-checks links; runs before the transaction so no row lock waits on HTTP. */
+    /**
+     * Normalizes and safety-checks all links before the transaction so no row lock waits on HTTP.
+     * Throws the problem of the first failing link, carrying its link_index.
+     */
     public List<WishLinkEntity> prepareLinks(List<WishLinkDTO> links) {
         if (links == null) {
             return List.of();
         }
+        List<String> urls = new ArrayList<>(links.size());
+        Map<Integer, ApiException> problems = new TreeMap<>();
+        for (int i = 0; i < links.size(); i++) {
+            try {
+                urls.add(linkValidator.normalize(links.get(i).url()));
+            } catch (ApiException e) {
+                urls.add(null);
+                problems.put(i, e.atLink(i));
+            }
+        }
+        linkSafety.findProblems(urls).forEach(problems::putIfAbsent);
+        if (!problems.isEmpty()) {
+            throw problems.values().iterator().next();
+        }
         List<WishLinkEntity> entities = new ArrayList<>(links.size());
         for (int i = 0; i < links.size(); i++) {
-            String url = linkValidator.normalize(links.get(i).url());
-            linkSafety.assertSafe(url);
-            entities.add(new WishLinkEntity(url, links.get(i).label(), (short) i));
+            entities.add(new WishLinkEntity(urls.get(i), links.get(i).label(), (short) i,
+                    URI.create(urls.get(i)).getHost()));
         }
         return entities;
     }

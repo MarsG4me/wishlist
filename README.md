@@ -26,9 +26,15 @@ Starting the parts by hand instead:
 
 ```bash
 docker compose up -d                 # Postgres 18 (host port 5433) + Keycloak 26
-cd backend && mvn spring-boot:run    # http://localhost:6543, Swagger at /docs/api-ui.html
+cd backend && SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run   # http://localhost:6543, Swagger at /docs/api-ui.html
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
+
+The `dev` profile (`application-dev.yml`) holds the local defaults for DB, Keycloak and CORS,
+including the dev secrets. Without it the base config has no defaults and startup fails
+until `DB_URL`, `DB_USER`, `DB_PASSWORD`, `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_BASE_URL`,
+`KEYCLOAK_REALM`, `KEYCLOAK_ADMIN_CLIENT_SECRET` and `FRONTEND_ORIGIN` are set.
+`./start.sh`, CI and `FullFlowIT` use it.
 
 Keycloak: http://localhost:8180 (admin/admin). Realm `wishlist-dev` is imported on first start. Self-registration is enabled in the dev realm.
 
@@ -73,7 +79,39 @@ container's environment (`KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`,
 `PUBLIC_API_URL`, `ADS_ENABLED`), so the same image runs in any environment. The
 `VITE_*` vars in `frontend/.env.development` are only the dev-server fallback.
 
+`/srv/www` is root-owned and read-only for the app user; the generated `config.js` and
+`csp.conf` live in `/tmp/nginx`. The inner nginx sends a `Content-Security-Policy` on every
+static response, rendered at start from the origins of `KEYCLOAK_URL` and `PUBLIC_API_URL`
+(same origin when empty): `default-src 'self'`, `script-src 'self'`, inline styles allowed
+(PrimeReact), `connect-src`/`frame-src`/`form-action` include the Keycloak origin,
+`frame-ancestors 'none'`. A malformed URL aborts the start. `ADS_ENABLED=true` adds no ad
+domains yet; add them to the entrypoint when an ad network is wired in.
+
+## Google login
+
+Keycloak's hosted login page offers Google; users with a Keycloak password account and the
+same email link after re-entering their password. Password and email changes stay
+Keycloak-only (hidden for Google users).
+
+1. In the Google Cloud console create an OAuth client (type *Web application*) with the
+   authorized redirect URI `https://<kc-host>/realms/<realm>/broker/google/endpoint`.
+2. Run the script (needs `jq`; idempotent, safe to re-run):
+
+```bash
+KC_URL=https://<kc-host> KC_REALM=<realm> KC_ADMIN=admin KC_ADMIN_PASSWORD=... \
+GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... deploy/keycloak/setup-google.sh
+# Keycloak in docker: KCADM="docker exec -i -e KC_CLI_PASSWORD <container> /opt/keycloak/bin/kcadm.sh"
+```
+
+It creates the `google` identity provider (trust email, sync mode import), a copy of the
+first-broker-login flow without the review-profile and email-verification steps, removes the
+API audience mapper from `wishlist-cli` (its tokens must not reach the API) and ensures the
+`identity_provider` claim mapper on `wishlist-frontend`. The privacy policy must name Google
+as a login provider.
+
 ## Configuration (env vars)
+
+Defaults below apply in the `dev` profile only; other profiles must set them.
 
 | Var | Default |
 |-----|---------|
@@ -81,13 +119,19 @@ container's environment (`KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`,
 | `DB_URL` | `jdbc:postgresql://localhost:5433/wishlist` (compose maps 5433→5432 to avoid clashing with a system Postgres) |
 | `DB_USER` / `DB_PASSWORD` | `wishlist` / `wishlist` |
 | `KEYCLOAK_ISSUER_URI` | `http://localhost:8180/realms/wishlist-dev` |
-| `KEYCLOAK_ACCOUNT_URL` | `http://localhost:8180/realms/wishlist-dev/account` |
+| `KEYCLOAK_BASE_URL` / `KEYCLOAK_REALM` | `http://localhost:8180` / `wishlist-dev` |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | `dev-secret` |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` |
 | `PURGE_ENABLED` | `true` (scheduled purge of soft-deleted rows > 30 days; `false` disables) |
 | `LINK_BLOCKLIST_ENABLED` | `true` (download domain blocklists at start and daily; wish links to listed domains are rejected) |
-| `LINK_BLOCKLIST_URLS` | comma-separated hosts-file or domain-per-line lists (default: URLhaus filter + Block List Project phishing/malware/scam/fraud/porn/abuse) |
-| `LINK_ALLOWED_DOMAINS` | comma-separated shop domains (and subdomains) that skip all link checks (default: major shops, see `application.yml`) |
+| `LINK_BLOCKLIST_URLS` | comma-separated hosts-file or domain-per-line lists (default: URLhaus filter + Block List Project phishing/malware/scam/fraud/abuse) |
+| `LINK_ALLOWED_DOMAINS` | comma-separated shop domains (and subdomains) that skip the automatic link checks unless an admin has blocked the domain (default: major shops, see `application.yml`) |
 | `WEB_RISK_API_KEY` | empty (set to enable Google Web Risk lookups for non-allowlisted links; fails open) |
+| `WEB_RISK_MONTHLY_LIMIT` | `100000` (Web Risk calls per month; once spent, new hosts pass unchecked; on the last day of the month the rest is spent re-checking the oldest host verdicts) |
+| `LINK_SHORTENER_DOMAINS` | comma-separated URL shorteners that are rejected unless allowlisted (default: bit.ly, tinyurl.com, t.co, goo.gl, ow.ly, is.gd, buff.ly, rebrand.ly, cutt.ly, shorturl.at, tiny.cc, rb.gy, t.ly; allowlisted shorteners such as amzn.to still pass) |
+
+Open business decision: membership of the IWF (Internet Watch Foundation) URL list is not
+part of the link checks yet.
 
 ## Roles
 

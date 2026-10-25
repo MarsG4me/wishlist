@@ -37,7 +37,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponseDTO> handleApiException(ApiException e) {
         return ResponseEntity.status(e.getErrorCode().getStatus())
-                .body(ErrorResponseDTO.of(e.getErrorCode(), e.getMessage()));
+                .body(ErrorResponseDTO.of(e.getErrorCode(), e.getMessage(), e.getLinkIndex()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -26,22 +27,24 @@ public class LinkBlocklistUpdater {
     private final LinkBlocklist blocklist;
     private final boolean enabled;
     private final List<String> urls;
+    private final ApplicationEventPublisher events;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NORMAL).build();
 
     public LinkBlocklistUpdater(LinkBlocklist blocklist,
             @Value("${wishlist.link-safety.blocklist.enabled}") boolean enabled,
-            @Value("${wishlist.link-safety.blocklist.urls}") List<String> urls) {
+            @Value("${wishlist.link-safety.blocklist.urls}") List<String> urls,
+            ApplicationEventPublisher events) {
         this.blocklist = blocklist;
         this.enabled = enabled;
         this.urls = urls.stream().map(String::trim).filter(u -> !u.isEmpty()).toList();
+        this.events = events;
     }
 
+    /** Without a blocklist the rescan still runs once, so hosts get backfilled and config changes apply. */
     @EventListener(ApplicationReadyEvent.class)
     void loadAtStartup() {
-        if (enabled) {
-            Thread.startVirtualThread(this::refresh);
-        }
+        Thread.startVirtualThread(enabled ? this::refresh : () -> events.publishEvent(new LinkListsChangedEvent(true)));
     }
 
     @Scheduled(cron = "0 30 4 * * *")
@@ -51,7 +54,7 @@ public class LinkBlocklistUpdater {
         }
     }
 
-    /** Aborts and keeps the current set on any failure, unless the set is still empty. */
+    /** Keeps the current set on any failure, unless it is empty; a partial set's rescan keeps BLOCKLIST flags. */
     void refresh() {
         long[] buffer = new long[1 << 16];
         int count = 0;
@@ -93,6 +96,7 @@ public class LinkBlocklistUpdater {
         }
         blocklist.swap(Arrays.copyOf(sorted, unique));
         log.info("Blocklist loaded: {} domains from {} sources", unique, urls.size());
+        events.publishEvent(new LinkListsChangedEvent(!failed));
     }
 
     private Stream<String> fetch(String url) throws Exception {

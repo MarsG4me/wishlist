@@ -37,6 +37,14 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
 
     long countByGroupsId(UUID groupsId);
 
+    /** Memberships of the user in non-deleted groups. */
+    @Query("""
+            SELECT COUNT(m) FROM GroupMembershipEntity m
+            JOIN GroupEntity g ON g.id = m.groupsId
+            WHERE m.usersId = :userId
+            """)
+    long countInLiveGroups(@Param("userId") UUID userId);
+
     /** True when both users are members of at least one common (non-deleted) group. */
     @Query("""
             SELECT COUNT(m1) > 0 FROM GroupMembershipEntity m1

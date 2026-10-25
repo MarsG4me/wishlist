@@ -21,6 +21,7 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
 
     private static final String ADMIN_AUTHORITY = "ROLE_admin";
     private static final String IDENTITY_PROVIDER_CLAIM = "identity_provider";
+    private static final String SESSION_ID_CLAIM = "sid";
 
     private final UserProvisioningService provisioningService;
 
@@ -46,7 +47,8 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         // set by the realm's "identity_provider" session-note mapper on federated logins
         String identityProvider = jwtAuth.getToken().getClaimAsString(IDENTITY_PROVIDER_CLAIM);
         return new AuthenticatedUser(user.getId(), user.getKeycloakId(), user.getDisplayname(),
-                user.getTier(), isAdmin, identityProvider);
+                user.getTier(), isAdmin, identityProvider,
+                jwtAuth.getToken().getClaimAsString(SESSION_ID_CLAIM));
     }
 
     /**

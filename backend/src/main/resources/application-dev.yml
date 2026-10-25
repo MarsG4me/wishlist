@@ -1,0 +1,20 @@
+# Local development defaults. Activate with SPRING_PROFILES_ACTIVE=dev (start.sh does).
+# Matches the docker-compose dev stack; never use these values outside a dev machine.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/wishlist}
+    username: ${DB_USER:wishlist}
+    password: ${DB_PASSWORD:wishlist}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/wishlist-dev}
+
+wishlist:
+  cors:
+    allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  keycloak:
+    base-url: ${KEYCLOAK_BASE_URL:http://localhost:8180}
+    realm: ${KEYCLOAK_REALM:wishlist-dev}
+    admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:dev-secret}

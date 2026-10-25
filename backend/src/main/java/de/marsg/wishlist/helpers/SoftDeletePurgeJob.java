@@ -52,7 +52,18 @@ public class SoftDeletePurgeJob {
                 }
             }
         });
+        purgeAudit();
         purgeUsers();
+    }
+
+    /** Audit rows live one year; their age is read from the UUIDv7 id. */
+    private void purgeAudit() {
+        int deleted = transactionTemplate.execute(status -> entityManager.createNativeQuery(
+                "DELETE FROM admin_audit WHERE uuid_extract_timestamp(id) < now() - interval '1 year'")
+                .executeUpdate());
+        if (deleted > 0) {
+            log.info("Purged {} rows from admin_audit", deleted);
+        }
     }
 
     private void purgeUsers() {
