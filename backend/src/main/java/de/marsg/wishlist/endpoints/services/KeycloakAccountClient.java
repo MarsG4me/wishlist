@@ -22,6 +22,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * All Keycloak interactions of the backend; Keycloak is the source of truth for account data.
@@ -31,6 +32,8 @@ import org.springframework.web.client.RestClientResponseException;
 public class KeycloakAccountClient {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakAccountClient.class);
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final RestClient restClient;
     private final String realm;
@@ -161,7 +164,16 @@ public class KeycloakAccountClient {
 
     /** Keycloak's own "User not found" 404, as opposed to a 404 from a wrong path or proxy. */
     private static boolean isUserNotFound(HttpClientErrorException.NotFound e) {
-        return e.getResponseBodyAsString().toLowerCase().contains("not found");
+        MediaType type = e.getResponseHeaders() == null ? null : e.getResponseHeaders().getContentType();
+        if (type == null || !MediaType.APPLICATION_JSON.isCompatibleWith(type)) {
+            return false;
+        }
+        try {
+            return JSON.readTree(e.getResponseBodyAsString()).path("error").asString("")
+                    .equalsIgnoreCase("User not found");
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     private <T> T fetchAdmin(String path, UUID keycloakId, Class<T> type) {

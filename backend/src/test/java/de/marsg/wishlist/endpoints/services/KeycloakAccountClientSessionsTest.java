@@ -1,9 +1,12 @@
 package de.marsg.wishlist.endpoints.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import de.marsg.wishlist.helpers.ApiException;
+import de.marsg.wishlist.helpers.ErrorCode;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +24,9 @@ class KeycloakAccountClientSessionsTest {
     private final List<String> deleted = new CopyOnWriteArrayList<>();
     private volatile int sessionsStatus = 200;
     private volatile int consentsStatus = 200;
+    private volatile int userStatus = 200;
+    private volatile String userBody = "{}";
+    private volatile String userContentType = "application/json";
     private HttpServer server;
     private KeycloakAccountClient client;
 
@@ -44,6 +50,9 @@ class KeycloakAccountClientSessionsTest {
         String body = "{}";
         if (path.endsWith("/token")) {
             body = "{\"access_token\":\"t\"}";
+        } else if (path.endsWith("/users/" + keycloakId) && ex.getRequestMethod().equals("GET")) {
+            status = userStatus;
+            body = userBody;
         } else if (path.endsWith("/consents") && ex.getRequestMethod().equals("GET")) {
             status = consentsStatus;
             body = "[{\"clientId\":\"app-a\",\"additionalGrants\":[{\"client\":\"app-a\",\"key\":\"Offline Token\"}]},"
@@ -58,7 +67,8 @@ class KeycloakAccountClientSessionsTest {
             body = "";
         }
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        ex.getResponseHeaders().add("Content-Type", "application/json");
+        ex.getResponseHeaders().add("Content-Type",
+                path.endsWith("/users/" + keycloakId) ? userContentType : "application/json");
         ex.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
         if (bytes.length > 0) {
             ex.getResponseBody().write(bytes);
@@ -109,5 +119,22 @@ class KeycloakAccountClientSessionsTest {
         consentsStatus = 500;
         client.changePassword("a@test.local", "old", keycloakId, "new", "keep");
         assertThat(deleted).containsExactlyInAnyOrder("other1", "other2");
+    }
+
+    @Test
+    void keycloakUserNotFoundMeansUserIsGone() {
+        userStatus = 404;
+        userBody = "{\"error\":\"User not found\"}";
+        assertThat(client.userExists(keycloakId)).isFalse();
+    }
+
+    @Test
+    void proxyHtml404IsKeycloakUnavailable() {
+        userStatus = 404;
+        userContentType = "text/html";
+        userBody = "<html><body><h1>404 Not Found</h1>nginx</body></html>";
+        assertThatThrownBy(() -> client.userExists(keycloakId))
+                .isInstanceOfSatisfying(ApiException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.KEYCLOAK_UNAVAILABLE));
     }
 }

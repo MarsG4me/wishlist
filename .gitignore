@@ -35,6 +35,10 @@ build/
 # deployment secrets
 deploy/.env
 
+# Local-only: deploy script names internal infra (host alias, Portainer domain)
+deploy/push.sh
+deploy/.env.push
+
 # python e2e
 tests/e2e/.venv/
 tests/e2e/.pytest_cache/
