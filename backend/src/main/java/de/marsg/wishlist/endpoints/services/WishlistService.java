@@ -57,6 +57,7 @@ public class WishlistService {
     @Transactional
     public ReturnWishlistDTO rename(UUID userId, UUID wishlistId, String name) {
         WishlistEntity wishlist = requireWishlist(wishlistId);
+        accessService.assertCanViewWishlist(userId, wishlist);
         accessService.assertWishlistOwner(userId, wishlist);
         wishlist.setName(name);
         return ReturnWishlistDTO.from(wishlist);
@@ -65,6 +66,7 @@ public class WishlistService {
     @Transactional
     public void softDelete(UUID userId, UUID wishlistId) {
         WishlistEntity wishlist = requireWishlist(wishlistId);
+        accessService.assertCanViewWishlist(userId, wishlist);
         accessService.assertWishlistOwner(userId, wishlist);
         wishlist.markDeleted();
         log.info("User {} soft-deleted wishlist {}", userId, wishlistId);

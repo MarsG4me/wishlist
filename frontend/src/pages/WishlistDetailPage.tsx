@@ -11,7 +11,10 @@ import { WishFormDialog } from '../components/WishFormDialog'
 import { CardActions } from '../components/CardActions'
 import { ListControls } from '../components/ListControls'
 import { useApiToast } from '../hooks/useApiToast'
-import { usePagedList } from '../hooks/usePagedList'
+import { useListStatus } from '../hooks/useListStatus'
+import { EmptyState } from '../components/EmptyState'
+import { ErrorState, ListSkeleton, PageHeader } from '../components/PageStates'
+import WishLink from '../components/WishLink'
 import { ApiError } from '../api/errors'
 import { tError, useT } from '../i18n'
 
@@ -25,7 +28,7 @@ export function WishlistDetailPage() {
   const t = useT()
 
   const fetcher = useCallback((page: PageQuery) => listWishes(id!, page), [id])
-  const list = usePagedList<OwnWish>(
+  const list = useListStatus<OwnWish>(
     fetcher as (page: PageQuery) => Promise<ListResponse<OwnWish>>,
     showError,
   )
@@ -39,6 +42,11 @@ export function WishlistDetailPage() {
   useEffect(() => {
     if (id) getWishlist(id).then(setWishlist).catch(showError)
   }, [id])
+
+  const openCreate = () => {
+    setEditing(null)
+    setDialogOpen(true)
+  }
 
   const save = async (input: WishInput) => {
     try {
@@ -96,17 +104,22 @@ export function WishlistDetailPage() {
       <p>
         <Link to="/">{t('wishlists.backLink')}</Link>
       </p>
-      <div className="page-header">
-        <h1>{wishlist?.name ?? '…'}</h1>
-        <Button
-          label={t('wishes.new')}
-          icon="pi pi-plus"
-          onClick={() => {
-            setEditing(null)
-            setDialogOpen(true)
-          }}
+      <PageHeader
+        title={wishlist?.name ?? '…'}
+        action={<Button label={t('wishes.new')} icon="pi pi-plus" onClick={openCreate} />}
+      />
+      {list.failed ? (
+        <ErrorState onRetry={list.reload} />
+      ) : list.initial ? (
+        <ListSkeleton />
+      ) : list.total === 0 ? (
+        <EmptyState
+          icon="pi pi-gift"
+          title={t('empty.wishes.title')}
+          text={t('empty.wishes.text')}
+          action={{ label: t('empty.wishes.action'), icon: 'pi pi-plus', onClick: openCreate }}
         />
-      </div>
+      ) : (
       <div className="card-grid">
         {wishes.map((wish) => (
           <Card
@@ -141,15 +154,13 @@ export function WishlistDetailPage() {
             />
             <div className="wish-card-links">
               {wish.links.map((link, i) => (
-                <a key={i} href={link.url} target="_blank" rel="noreferrer">
-                  {link.label || new URL(link.url).hostname}
-                </a>
+                <WishLink key={i} url={link.url} label={link.label} />
               ))}
             </div>
           </Card>
         ))}
-        {list.total === 0 && !list.loading && <p className="muted">{t('wishes.empty')}</p>}
       </div>
+      )}
       <ListControls
         total={list.total}
         limit={list.limit}

@@ -113,6 +113,16 @@ export interface Invite {
   use_count: number
 }
 
+export interface InvitePreview {
+  group_name?: string | null
+  creator_displayname?: string | null
+  member_count?: number | null
+  expires_at?: string | null
+  status: 'valid' | 'expired' | 'revoked' | 'exhausted'
+  already_member?: boolean | null
+  group_id?: string | null
+}
+
 export interface Membership {
   id: string
   group_id: string

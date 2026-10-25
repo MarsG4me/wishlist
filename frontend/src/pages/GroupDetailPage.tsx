@@ -29,7 +29,9 @@ import { listMembers, removeMember, setMemberAdmin } from '../api/memberships'
 import type { Group, Invite, Membership, PageQuery, SharedWishlist, Wishlist } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import { useApiToast } from '../hooks/useApiToast'
-import { usePagedList } from '../hooks/usePagedList'
+import { useListStatus } from '../hooks/useListStatus'
+import { EmptyState } from '../components/EmptyState'
+import { ErrorState, ListSkeleton, PageHeader } from '../components/PageStates'
 import { MemberTable } from '../components/MemberTable'
 import { CardActions } from '../components/CardActions'
 import { ListControls } from '../components/ListControls'
@@ -59,10 +61,10 @@ export function GroupDetailPage() {
   const sharesFetcher = useCallback((page: PageQuery) => listShares(id!, page), [id])
   const membersFetcher = useCallback((page: PageQuery) => listMembers(id!, page), [id])
   const invitesFetcher = useCallback((page: PageQuery) => listInvites(id!, page), [id])
-  const shares = usePagedList<SharedWishlist>(sharesFetcher, showError)
-  const members = usePagedList<Membership>(membersFetcher, showError)
+  const shares = useListStatus<SharedWishlist>(sharesFetcher, showError)
+  const members = useListStatus<Membership>(membersFetcher, showError)
   // invites are admin-only: fetching them as a plain member would only produce a 403 toast
-  const invites = usePagedList<Invite>(invitesFetcher, showError, 20, canManage)
+  const invites = useListStatus<Invite>(invitesFetcher, showError, 20, canManage)
 
   const loadGroup = useCallback(() => {
     if (!id) return
@@ -88,7 +90,7 @@ export function GroupDetailPage() {
     loadShareable()
   }, [loadGroup, loadShareable])
 
-  if (!id || !group) return <p className="muted">…</p>
+  if (!id || !group) return <ListSkeleton count={1} />
 
   const share = async () => {
     if (!shareTarget) return
@@ -172,9 +174,7 @@ export function GroupDetailPage() {
       <p>
         <Link to="/groups">{t('groups.backLink')}</Link>
       </p>
-      <div className="page-header">
-        <h1>{group.name}</h1>
-      </div>
+      <PageHeader title={group.name} subtitle={group.description ?? undefined} />
       <TabView>
         <TabPanel header={t('groups.tabShares')}>
           <div className="claim-row" style={{ marginBottom: '1rem' }}>
@@ -184,6 +184,22 @@ export function GroupDetailPage() {
               onClick={() => setShareDialogOpen(true)}
             />
           </div>
+          {shares.failed ? (
+            <ErrorState onRetry={shares.reload} />
+          ) : shares.initial ? (
+            <ListSkeleton />
+          ) : shares.total === 0 ? (
+            <EmptyState
+              icon="pi pi-share-alt"
+              title={t('empty.shares.title')}
+              text={t('empty.shares.text')}
+              action={{
+                label: t('groups.shareWishlist'),
+                icon: 'pi pi-share-alt',
+                onClick: () => setShareDialogOpen(true),
+              }}
+            />
+          ) : (
           <div className="card-grid">
             {shares.items.map((entry) => {
               // an own list stays the editable own view; other people's lists open the claim view
@@ -218,10 +234,8 @@ export function GroupDetailPage() {
                 </Card>
               )
             })}
-            {shares.total === 0 && !shares.loading && (
-              <p className="muted">{t('groups.nothingShared')}</p>
-            )}
           </div>
+          )}
           <ListControls
             total={shares.total}
             limit={shares.limit}
@@ -236,6 +250,9 @@ export function GroupDetailPage() {
         </TabPanel>
 
         <TabPanel header={t('groups.tabMembers')}>
+          {members.failed && <ErrorState onRetry={members.reload} />}
+          {members.initial && !members.failed && <ListSkeleton />}
+          {!members.failed && !members.initial && (
           <MemberTable
             members={members.items}
             ownUserId={user?.id ?? ''}
@@ -259,6 +276,7 @@ export function GroupDetailPage() {
               }
             }}
           />
+          )}
           <ListControls
             total={members.total}
             limit={members.limit}
@@ -289,7 +307,19 @@ export function GroupDetailPage() {
               )}
               <Button label={t('invites.new')} icon="pi pi-plus" onClick={newInvite} />
             </div>
-            <DataTable value={invites.items} dataKey="id" emptyMessage={t('invites.empty')}>
+            {invites.failed ? (
+              <ErrorState onRetry={invites.reload} />
+            ) : invites.initial ? (
+              <ListSkeleton />
+            ) : invites.total === 0 ? (
+              <EmptyState
+                icon="pi pi-link"
+                title={t('empty.invites.title')}
+                text={t('empty.invites.text')}
+                action={{ label: t('invites.new'), icon: 'pi pi-plus', onClick: newInvite }}
+              />
+            ) : (
+            <DataTable value={invites.items} dataKey="id">
               <Column field="code" header={t('invites.code')} />
               <Column header={t('invites.status')} body={inviteState} />
               <Column
@@ -320,6 +350,7 @@ export function GroupDetailPage() {
                 }
               />
             </DataTable>
+            )}
             <ListControls
               total={invites.total}
               limit={invites.limit}
@@ -388,7 +419,7 @@ export function GroupDetailPage() {
         </div>
         <Button label={t('common.add')} icon="pi pi-plus" disabled={!shareTarget} onClick={share} />
       </Dialog>
-      <InviteDialog invite={freshInvite} onHide={() => setFreshInvite(null)} />
+      <InviteDialog invite={freshInvite} groupName={group.name} onHide={() => setFreshInvite(null)} />
     </div>
   )
 }

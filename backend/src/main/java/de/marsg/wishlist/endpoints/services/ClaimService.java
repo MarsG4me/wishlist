@@ -84,6 +84,7 @@ public class ClaimService {
     public ReturnWishClaimDTO join(UUID userId, UUID claimId) {
         ClaimEntity claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new ApiException(ErrorCode.CLAIM_NOT_FOUND));
+        assertClaimVisible(userId, claim);
         lockedClaimableWish(userId, claim.getWishesId());
         if (!claim.isShared()) {
             throw new ApiException(ErrorCode.CLAIM_NOT_SHARED);
@@ -98,6 +99,7 @@ public class ClaimService {
     public ReturnWishClaimDTO setShared(UUID userId, UUID claimId, boolean shared) {
         ClaimEntity claim = claimRepository.findById(claimId)
                 .orElseThrow(() -> new ApiException(ErrorCode.CLAIM_NOT_FOUND));
+        assertClaimVisible(userId, claim);
         // being recorded as creator is not enough: someone who left the claim (or lost
         // access to the wishlist) must not keep steering who may pool money into it
         if (!userId.equals(claim.getUsersId())
@@ -221,6 +223,18 @@ public class ClaimService {
                 })
                 .filter(Objects::nonNull)
                 .toList());
+    }
+
+    /** A claim exists for the caller only while they may view its wishlist as a non-owner. */
+    private void assertClaimVisible(UUID userId, ClaimEntity claim) {
+        boolean visible = wishRepository.findById(claim.getWishesId())
+                .flatMap(wish -> wishlistRepository.findById(wish.getWishlistsId()))
+                .map(wishlist -> !wishlist.getUsersId().equals(userId)
+                        && accessService.canViewAsSharedWishlist(userId, wishlist.getId()))
+                .orElse(false);
+        if (!visible) {
+            throw new ApiException(ErrorCode.CLAIM_NOT_FOUND);
+        }
     }
 
     /**

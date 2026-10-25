@@ -15,6 +15,7 @@ import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,8 @@ class FullFlowIT {
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
+        registry.add("wishlist.link-safety.blocklist.enabled", () -> "false");
+        registry.add("wishlist.purge.enabled", () -> "false");
         String externalUrl = System.getenv("IT_DB_URL");
         if (externalUrl != null) {
             registry.add("spring.datasource.url", () -> externalUrl);
@@ -135,6 +138,11 @@ class FullFlowIT {
                 .andReturn().getResponse().getContentAsString();
     }
 
+    @BeforeEach
+    void keycloakKnowsEveryone() {
+        Mockito.when(keycloakAccountClient.userExists(Mockito.any(UUID.class))).thenReturn(true);
+    }
+
     // ---------- health & error shape ----------
 
     @Test
@@ -179,10 +187,11 @@ class FullFlowIT {
     @Test
     @Order(12)
     void emailChangeGoesThroughKeycloakFirst() throws Exception {
-        mvc.perform(json(patch("/v1/users/me/email").with(alice()), "{\"email\":\"alice.new@it.local\"}"))
+        mvc.perform(json(patch("/v1/users/me/email").with(alice()), "{\"email\":\"alice.new@it.local\",\"current_password\":\"pw\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("alice.new@it.local"));
-        Mockito.verify(keycloakAccountClient).updateEmail(Mockito.anyString(), Mockito.eq("alice.new@it.local"));
+        Mockito.verify(keycloakAccountClient).verifyCurrentPassword(Mockito.anyString(), Mockito.eq("pw"));
+        Mockito.verify(keycloakAccountClient).updateEmail(Mockito.any(UUID.class), Mockito.eq("alice.new@it.local"));
     }
 
     @Test
@@ -289,7 +298,7 @@ class FullFlowIT {
         mvc.perform(get("/v1/users/me").with(google))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.locale").value("DE"));
-        mvc.perform(json(patch("/v1/users/me/email").with(google), "{\"email\":\"greta2@it.local\"}"))
+        mvc.perform(json(patch("/v1/users/me/email").with(google), "{\"email\":\"greta2@it.local\",\"current_password\":\"pw\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error_code").value("ACCOUNT_MANAGED_EXTERNALLY"));
         mvc.perform(json(patch("/v1/users/me/locale").with(google), "{\"locale\":\"EN\"}"))
@@ -379,9 +388,10 @@ class FullFlowIT {
         mvc.perform(get("/v1/groups/" + groupId + "/invites").with(alice()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].use_count").value(0));
-        // non-admin bob cannot see invites
+        // bob is no member yet: the group is hidden from him
         mvc.perform(get("/v1/groups/" + groupId + "/invites").with(bob()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error_code").value("GROUP_NOT_FOUND"));
     }
 
     @Test
@@ -418,6 +428,12 @@ class FullFlowIT {
                         "{\"code\":\"" + inviteCode + "\"}"))
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.error_code").value("INVITE_REVOKED"));
+        // a revoked invite previews as its status alone
+        mvc.perform(get("/v1/invites/" + inviteCode + "/preview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("revoked"))
+                .andExpect(jsonPath("$.group_name").doesNotExist())
+                .andExpect(jsonPath("$.member_count").doesNotExist());
         mvc.perform(get("/v1/groups/" + groupId + "/invites").with(alice()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].revoked_at").isNotEmpty());
@@ -590,14 +606,14 @@ class FullFlowIT {
     @Test
     @Order(51)
     void deletingGroupAndWishlist() throws Exception {
-        // the share vanished with alice's membership, so there is nothing left to unshare
+        // alice left the group, so for her it no longer exists (nor does its share)
         mvc.perform(delete("/v1/groups/" + groupId + "/shares/" + wishlistId).with(alice()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error_code").value("SHARE_NOT_FOUND"));
-        // carol is no member anymore -> no admin rights
+                .andExpect(jsonPath("$.error_code").value("GROUP_NOT_FOUND"));
+        // carol is no member anymore -> the group answers like a missing one
         mvc.perform(delete("/v1/groups/" + groupId).with(carol()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error_code").value("NOT_GROUP_ADMIN"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error_code").value("GROUP_NOT_FOUND"));
         // bob is group admin -> may delete the group
         mvc.perform(delete("/v1/groups/" + groupId).with(bob()))
                 .andExpect(status().isNoContent());
@@ -606,6 +622,10 @@ class FullFlowIT {
         mvc.perform(get("/v1/wishlists").with(alice()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(0));
+        // the export still lists the soft-deleted wishlist, marked with deleted_at
+        mvc.perform(get("/v1/users/me/export").with(alice()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.wishlists[0].deleted_at").isNotEmpty());
     }
 
     @Test
@@ -614,7 +634,14 @@ class FullFlowIT {
         mvc.perform(delete("/v1/users/me").with(dave()))
                 .andExpect(status().isNoContent());
         // logging in again within the purge window restores the account with its data
-        mvc.perform(get("/v1/users/me").with(dave()))
+        RequestPostProcessor freshLogin = jwt()
+                .jwt(jwt -> jwt.subject(DAVE.toString())
+                        .claim("given_name", "Dave")
+                        .claim("family_name", "Dent")
+                        .claim("email", "dave@it.local")
+                        .claim("auth_time", java.time.Instant.now().plusSeconds(5)))
+                .authorities(List.of(new SimpleGrantedAuthority("ROLE_user")));
+        mvc.perform(get("/v1/users/me").with(freshLogin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.displayname").value("Dave Dent"));
     }

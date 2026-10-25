@@ -3,13 +3,16 @@ package de.marsg.wishlist.endpoints.services;
 import de.marsg.wishlist.endpoints.dto.admin.ReturnAdminStatsDTO;
 import de.marsg.wishlist.endpoints.dto.admin.ReturnAdminUserDTO;
 import de.marsg.wishlist.endpoints.dto.common.ReturnListDTO;
+import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO;
 import de.marsg.wishlist.helpers.PageParams;
+import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -27,9 +30,13 @@ public class AdminService {
     private final UserRepository userRepository;
     private final WishlistRepository wishlistRepository;
     private final WishRepository wishRepository;
+    private final UserService userService;
+    private final UserExportService exportService;
 
     public AdminService(UserRepository userRepository, WishlistRepository wishlistRepository,
-            WishRepository wishRepository) {
+            WishRepository wishRepository, UserService userService, UserExportService exportService) {
+        this.userService = userService;
+        this.exportService = exportService;
         this.userRepository = userRepository;
         this.wishlistRepository = wishlistRepository;
         this.wishRepository = wishRepository;
@@ -46,12 +53,34 @@ public class AdminService {
 
     /** Substring search reaches every account, so who looked for what is audited. */
     @Transactional(readOnly = true)
-    public ReturnListDTO<ReturnAdminUserDTO> searchByEmail(UUID adminId, String email, Integer limit,
-            Integer offset) {
+    public ReturnListDTO<ReturnAdminUserDTO> searchByEmail(UUID adminId, String email,
+            boolean includeDeleted, Integer limit, Integer offset) {
         Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.ASC, "email"));
-        ReturnListDTO<ReturnAdminUserDTO> result = ReturnListDTO.of(
-                userRepository.findByEmailContainingIgnoreCase(email, pageable), ReturnAdminUserDTO::from);
-        log.info("Admin {} searched accounts for \"{}\": {} match(es)", adminId, email, result.total());
+        Page<UserEntity> page = includeDeleted
+                ? userRepository.searchByEmailIncludingDeleted(
+                        "%" + email.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%", pageable)
+                : userRepository.findByEmailContainingIgnoreCase(email, pageable);
+        ReturnListDTO<ReturnAdminUserDTO> result = ReturnListDTO.of(page, ReturnAdminUserDTO::from);
+        // the raw term is personal data and stays out of the log
+        log.info("Admin {} searched accounts (term length {}, include_deleted {}): {} match(es)",
+                adminId, email.length(), includeDeleted, result.total());
         return result;
+    }
+
+    /** Export of any account, soft-deleted ones included; the access is audited. */
+    @Transactional(readOnly = true)
+    public ReturnUserExportDTO exportUser(UUID adminId, UUID targetId) {
+        log.info("Admin {} exported data of user {}", adminId, targetId);
+        return exportService.export(targetId);
+    }
+
+    /** Soft delete like the self-service one, or immediate erasure when requested. */
+    public void deleteUser(UUID adminId, UUID targetId, boolean immediate) {
+        log.info("Admin {} deletes user {} (immediate {})", adminId, targetId, immediate);
+        if (immediate) {
+            userService.eraseUserNow(targetId);
+        } else {
+            userService.softDeleteUser(targetId);
+        }
     }
 }

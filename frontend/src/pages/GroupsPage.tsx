@@ -11,7 +11,9 @@ import type { Group, PageQuery } from '../api/types'
 import { CardActions } from '../components/CardActions'
 import { ListControls } from '../components/ListControls'
 import { useApiToast } from '../hooks/useApiToast'
-import { usePagedList } from '../hooks/usePagedList'
+import { useListStatus } from '../hooks/useListStatus'
+import { EmptyState } from '../components/EmptyState'
+import { ErrorState, ListSkeleton, PageHeader } from '../components/PageStates'
 import { useT } from '../i18n'
 
 export function GroupsPage() {
@@ -23,7 +25,7 @@ export function GroupsPage() {
   const t = useT()
 
   const fetcher = useCallback((page: PageQuery) => listGroups(page), [])
-  const list = usePagedList<Group>(fetcher, showError)
+  const list = useListStatus<Group>(fetcher, showError)
 
   const openCreate = () => {
     setEditing(null)
@@ -70,10 +72,27 @@ export function GroupsPage() {
   return (
     <div>
       <ConfirmDialog />
-      <div className="page-header">
-        <h1>{t('groups.title')}</h1>
-        <Button label={t('groups.new')} icon="pi pi-plus" onClick={openCreate} />
-      </div>
+      <PageHeader
+        title={t('groups.title')}
+        subtitle={t('groups.subtitle')}
+        action={<Button label={t('groups.new')} icon="pi pi-plus" onClick={openCreate} />}
+      />
+      {list.failed ? (
+        <ErrorState onRetry={list.reload} />
+      ) : list.initial ? (
+        <ListSkeleton />
+      ) : list.total === 0 ? (
+        <EmptyState
+          icon="pi pi-users"
+          title={t('empty.groups.title')}
+          text={t('empty.groups.text')}
+          action={{ label: t('groups.new'), icon: 'pi pi-plus', onClick: openCreate }}
+        >
+          <p className="empty-state-hint">
+            <i className="pi pi-link" /> {t('empty.groups.join')}
+          </p>
+        </EmptyState>
+      ) : (
       <div className="card-grid">
         {list.items.map((group) => (
           <Card
@@ -101,10 +120,8 @@ export function GroupsPage() {
             />
           </Card>
         ))}
-        {list.total === 0 && !list.loading && (
-          <p className="muted">{t('groups.empty')}</p>
-        )}
       </div>
+      )}
       <ListControls
         total={list.total}
         limit={list.limit}

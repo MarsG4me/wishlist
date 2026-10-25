@@ -25,3 +25,17 @@ api.interceptors.response.use(
     throw error
   },
 )
+
+/** Rethrows a failed blob request as ApiError by parsing the error Blob's JSON body. */
+export const rethrowBlobError = async (error: unknown): Promise<never> => {
+  const res = axios.isAxiosError(error) ? error.response : undefined
+  if (res?.data instanceof Blob) {
+    try {
+      const data = JSON.parse(await res.data.text())
+      if (data?.error_code) throw new ApiError(data.error_code, data.message, res.status)
+    } catch (e) {
+      if (e instanceof ApiError) throw e
+    }
+  }
+  throw error
+}

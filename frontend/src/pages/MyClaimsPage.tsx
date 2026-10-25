@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { DataTable } from 'primereact/datatable'
 import { Column } from 'primereact/column'
 import { Button } from 'primereact/button'
@@ -9,15 +9,18 @@ import type { MyClaim, PageQuery } from '../api/types'
 import { ListControls } from '../components/ListControls'
 import { useAuth } from '../auth/AuthProvider'
 import { useApiToast } from '../hooks/useApiToast'
-import { usePagedList } from '../hooks/usePagedList'
+import { useListStatus } from '../hooks/useListStatus'
+import { EmptyState } from '../components/EmptyState'
+import { ErrorState, ListSkeleton, PageHeader } from '../components/PageStates'
 import { useT } from '../i18n'
 
 export function MyClaimsPage() {
   const { user } = useAuth()
   const { showError, showSuccess } = useApiToast()
   const t = useT()
+  const navigate = useNavigate()
   const fetcher = useCallback((page: PageQuery) => listMyClaims(page), [])
-  const list = usePagedList<MyClaim>(fetcher, showError)
+  const list = useListStatus<MyClaim>(fetcher, showError)
 
   const run = async (action: () => Promise<unknown>, message: string) => {
     try {
@@ -31,13 +34,23 @@ export function MyClaimsPage() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>{t('claims.title')}</h1>
-      </div>
-      <DataTable value={list.items} dataKey="claim_id" emptyMessage={t('claims.empty')}>
+      <PageHeader title={t('claims.title')} subtitle={t('claims.subtitle')} />
+      {list.failed ? (
+        <ErrorState onRetry={list.reload} />
+      ) : list.initial ? (
+        <ListSkeleton />
+      ) : list.total === 0 ? (
+        <EmptyState
+          icon="pi pi-gift"
+          title={t('empty.claims.title')}
+          text={t('empty.claims.text')}
+          action={{ label: t('empty.claims.action'), icon: 'pi pi-users', onClick: () => navigate('/groups') }}
+        />
+      ) : (
+      <DataTable value={list.items} dataKey="claim_id">
         <Column
           header={t('claims.wish')}
-          body={(claim: MyClaim) => <Link to={`/wishes/${claim.wish_id}`}>{claim.wish_name}</Link>}
+          body={(claim: MyClaim) => <Link to={`/wishes/${claim.wish_id}`} state={{ nav: 'claims' }}>{claim.wish_name}</Link>}
         />
         <Column
           header={t('claims.wishlist')}
@@ -96,6 +109,7 @@ export function MyClaimsPage() {
           )}
         />
       </DataTable>
+      )}
       <ListControls
         total={list.total}
         limit={list.limit}

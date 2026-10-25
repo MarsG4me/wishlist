@@ -6,7 +6,7 @@ import { Dropdown } from 'primereact/dropdown'
 import { Tag } from 'primereact/tag'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
 import { useAuth } from '../auth/AuthProvider'
-import { deleteOwnAccount, updateDisplayname, updateEmail, updateLocale, updatePassword } from '../api/users'
+import { deleteOwnAccount, downloadExport, updateDisplayname, updateEmail, updateLocale, updatePassword } from '../api/users'
 import { Password } from 'primereact/password'
 import { keycloak } from '../auth/keycloak'
 import { setLanguage, useT } from '../i18n'
@@ -20,6 +20,7 @@ export function ProfilePage() {
   const [displayname, setDisplayname] = useState(user?.displayname ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [locale, setLocale] = useState<Locale>(user?.locale ?? 'EN')
+  const [emailPassword, setEmailPassword] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
@@ -37,7 +38,8 @@ export function ProfilePage() {
   /** Backend updates Keycloak first, then the DB; afterwards force a token refresh. */
   const saveEmail = async () => {
     try {
-      await updateEmail(email)
+      await updateEmail(email, emailPassword)
+      setEmailPassword('')
       await keycloak.updateToken(-1).catch(() => keycloak.login())
       await refreshUser()
       showSuccess(t('profile.emailUpdated'))
@@ -74,9 +76,17 @@ export function ProfilePage() {
     }
   }
 
+  const exportData = async () => {
+    try {
+      await downloadExport()
+    } catch (e) {
+      showError(e)
+    }
+  }
+
   const removeAccount = () =>
     confirmDialog({
-      message: t('profile.deleteAccountMessage'),
+      message: t('profile.deleteGraceMessage'),
       header: t('profile.deleteAccount'),
       icon: 'pi pi-exclamation-triangle',
       acceptClassName: 'p-button-danger',
@@ -150,10 +160,17 @@ export function ProfilePage() {
             <Button
               label={t('common.change')}
               icon="pi pi-check"
-              disabled={email === user?.email}
+              disabled={email === user?.email || !emailPassword}
               onClick={saveEmail}
             />
           </div>
+          <Password
+            value={emailPassword}
+            placeholder={t('profile.currentPassword')}
+            feedback={false}
+            toggleMask
+            onChange={(e) => setEmailPassword(e.target.value)}
+          />
         </div>
         <div className="form-field" style={{ maxWidth: 420 }}>
           <label>{t('profile.changePassword')}</label>
@@ -193,6 +210,11 @@ export function ProfilePage() {
         </div>
       </Card>
       )}
+      <br />
+
+      <Card title={t('profile.exportData')} subTitle={t('profile.exportHint')}>
+        <Button label={t('profile.exportData')} icon="pi pi-download" outlined onClick={exportData} />
+      </Card>
       <br />
 
       <Card title={t('profile.dangerZone')}>

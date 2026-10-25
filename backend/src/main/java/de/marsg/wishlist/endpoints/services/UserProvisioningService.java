@@ -2,9 +2,11 @@ package de.marsg.wishlist.endpoints.services;
 
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.helpers.SoftDeletePurgeJob;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.entities.UserLocale;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +25,11 @@ public class UserProvisioningService {
     private static final Logger log = LoggerFactory.getLogger(UserProvisioningService.class);
 
     private final UserRepository userRepository;
+    private final KeycloakAccountClient keycloakAccountClient;
 
-    public UserProvisioningService(UserRepository userRepository) {
+    public UserProvisioningService(UserRepository userRepository, KeycloakAccountClient keycloakAccountClient) {
         this.userRepository = userRepository;
+        this.keycloakAccountClient = keycloakAccountClient;
     }
 
     @Transactional
@@ -37,11 +41,26 @@ public class UserProvisioningService {
 
     private UserEntity restoreOrCreate(Jwt jwt, UUID keycloakId) {
         return userRepository.findByKeycloakIdIncludingDeleted(keycloakId)
-                .map(this::restore)
-                .orElseGet(() -> create(jwt, keycloakId));
+                .map(deleted -> restore(jwt, deleted))
+                .orElseGet(() -> createIfStillKnown(jwt, keycloakId));
     }
 
-    private UserEntity restore(UserEntity deleted) {
+    /** First contact only: a Keycloak user that was erased must not be resurrected by a leftover token. */
+    private UserEntity createIfStillKnown(Jwt jwt, UUID keycloakId) {
+        if (!keycloakAccountClient.userExists(keycloakId)) {
+            throw new ApiException(ErrorCode.ACCOUNT_DELETED);
+        }
+        return create(jwt, keycloakId);
+    }
+
+    /** Only a login after the deletion restores; tokens of old tabs must not undo it. */
+    // auth_time is required: a refreshed token gets a new iat, so iat proves nothing.
+    private UserEntity restore(Jwt jwt, UserEntity deleted) {
+        Instant loggedIn = jwt.hasClaim("auth_time") ? jwt.getClaimAsInstant("auth_time") : null;
+        boolean purgeable = deleted.getDeletedAt().isBefore(Instant.now().minus(SoftDeletePurgeJob.RETENTION));
+        if (purgeable || loggedIn == null || !loggedIn.isAfter(deleted.getDeletedAt())) {
+            throw new ApiException(ErrorCode.ACCOUNT_DELETED);
+        }
         deleted.restore();
         log.info("Restored soft-deleted user {}", deleted.getId());
         return userRepository.save(deleted);

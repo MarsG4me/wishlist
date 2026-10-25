@@ -18,11 +18,11 @@ public class GroupEntity extends SoftDeletable {
     private UUID id;
 
     /**
-     * Creator. Only informational — authority comes from the admin flag on memberships.
-     * Transferred to another admin when the creator leaves, so the row never cascades
-     * away with an account that is no longer part of the group.
+     * Creator ({@code null} once their account was purged); informational only, authority
+     * comes from the admin flag on memberships. Handed to another admin when the creator
+     * leaves, so the row never cascades away with them.
      */
-    @Column(name = "users_id", nullable = false)
+    @Column(name = "users_id")
     private UUID usersId;
 
     @Column(name = "name", nullable = false, length = 100)

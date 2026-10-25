@@ -20,8 +20,8 @@ public class GroupInviteEntity {
     @Column(name = "groups_id", nullable = false, updatable = false)
     private UUID groupsId;
 
-    /** Creator. */
-    @Column(name = "users_id", nullable = false, updatable = false)
+    /** Creator; {@code null} once their account was purged. */
+    @Column(name = "users_id", updatable = false)
     private UUID usersId;
 
     @Column(name = "code", nullable = false, unique = true, updatable = false, length = 32)

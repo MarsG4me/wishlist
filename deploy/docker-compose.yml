@@ -42,6 +42,8 @@ services:
       # --- app ---
       FRONTEND_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN}
       PURGE_ENABLED: ${PURGE_ENABLED:-true}
+      LINK_BLOCKLIST_ENABLED: ${LINK_BLOCKLIST_ENABLED:-true}
+      WEB_RISK_API_KEY: ${WEB_RISK_API_KEY:-}
       # real client addresses for the inner rate limits and the /health allowlist
       TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR:?set TRUSTED_PROXY_CIDR}
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError}

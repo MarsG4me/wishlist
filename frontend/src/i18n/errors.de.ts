@@ -4,6 +4,9 @@ export const errorsDe: Record<string, string> = {
   UNAUTHENTICATED: 'Bitte melde dich erneut an.',
   FORBIDDEN: 'Das darfst du nicht.',
   ROUTE_NOT_FOUND: 'Diese Aktion ist unbekannt.',
+  METHOD_NOT_ALLOWED: 'Diese Aktion wird nicht unterstützt.',
+  UNSUPPORTED_MEDIA_TYPE: 'Das Anfrageformat wird nicht unterstützt.',
+  CONFLICT: 'Das steht im Konflikt mit vorhandenen Daten. Bitte versuche es erneut.',
   USER_NOT_FOUND: 'Nutzer nicht gefunden.',
   EMAIL_ALREADY_EXISTS:
     'Ein Konto mit dieser E-Mail existiert bereits. Falls du es gelöscht hast, melde dich mit dem ursprünglichen Login an, um es zu reaktivieren.',
@@ -30,6 +33,8 @@ export const errorsDe: Record<string, string> = {
   INVITE_EXPIRED: 'Diese Einladung ist abgelaufen.',
   INVITE_REVOKED: 'Diese Einladung wurde zurückgezogen.',
   INVITE_EXHAUSTED: 'Diese Einladung hat keine Verwendungen mehr.',
+  INVALID_LINK_URL: 'Links müssen öffentliche http- oder https-Adressen sein.',
+  LINK_BLOCKED: 'Dieser Link wurde von unseren Sicherheitsprüfungen blockiert.',
   CLAIM_NOT_FOUND: 'Übernahme nicht gefunden.',
   CANNOT_CLAIM_OWN_WISH: 'Du kannst deinen eigenen Wunsch nicht übernehmen.',
   ALREADY_CLAIMED: 'Du beteiligst dich bereits an einer Übernahme dieses Wunsches.',
@@ -39,5 +44,6 @@ export const errorsDe: Record<string, string> = {
   NOT_CLAIM_OWNER: 'Nur wer diese Übernahme gemacht hat, kann sie ändern.',
   INVALID_CREDENTIALS: 'Das aktuelle Passwort ist falsch.',
   KEYCLOAK_UPDATE_FAILED: 'Die Kontoänderung wurde abgelehnt. Bitte versuche es erneut.',
+  ACCOUNT_DELETED: 'Dieses Konto wurde gelöscht.',
   INTERNAL_ERROR: 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.',
 }

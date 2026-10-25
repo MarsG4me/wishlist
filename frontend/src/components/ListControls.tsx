@@ -45,6 +45,8 @@ export function ListControls({
     return () => observer.disconnect()
   }, [isMobile, hasMore, loading, onLoadMore])
 
+  if (total === 0) return null
+
   const sizePicker = (
     <span className="list-controls-size">
       <label htmlFor="page-size">{t('common.perPage')}</label>

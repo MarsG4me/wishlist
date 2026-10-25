@@ -4,13 +4,15 @@ import { Card } from 'primereact/card'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
 import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { createWishlist, deleteWishlist, listWishlists, renameWishlist } from '../api/wishlists'
 import type { PageQuery, Wishlist } from '../api/types'
 import { useApiToast } from '../hooks/useApiToast'
-import { usePagedList } from '../hooks/usePagedList'
+import { useListStatus } from '../hooks/useListStatus'
 import { CardActions } from '../components/CardActions'
 import { ListControls } from '../components/ListControls'
+import { ErrorState, ListSkeleton, PageHeader } from '../components/PageStates'
+import { OnboardingCard } from '../components/onboarding/OnboardingCard'
 import { useT } from '../i18n'
 
 export function MyWishlistsPage() {
@@ -19,9 +21,10 @@ export function MyWishlistsPage() {
   const [name, setName] = useState('')
   const { showError, showSuccess } = useApiToast()
   const t = useT()
+  const navigate = useNavigate()
 
   const fetcher = useCallback((page: PageQuery) => listWishlists(page), [])
-  const list = usePagedList<Wishlist>(fetcher, showError)
+  const list = useListStatus<Wishlist>(fetcher, showError)
 
   const openCreate = () => {
     setEditing(null)
@@ -36,10 +39,17 @@ export function MyWishlistsPage() {
 
   const save = async () => {
     try {
+      const isFirst = !editing && list.total === 0
+      let created: Wishlist | null = null
       if (editing) await renameWishlist(editing.id, name)
-      else await createWishlist(name)
+      else created = await createWishlist(name)
       setDialogOpen(false)
       showSuccess(t('common.saved'))
+      // the first wishlist leads straight into adding its first wish
+      if (isFirst && created) {
+        navigate(`/wishlists/${created.id}`)
+        return
+      }
       list.reload()
     } catch (e) {
       showError(e)
@@ -65,10 +75,19 @@ export function MyWishlistsPage() {
   return (
     <div>
       <ConfirmDialog />
-      <div className="page-header">
-        <h1>{t('wishlists.title')}</h1>
-        <Button label={t('wishlists.new')} icon="pi pi-plus" onClick={openCreate} />
-      </div>
+      <PageHeader
+        title={t('wishlists.title')}
+        subtitle={t('wishlists.subtitle')}
+        action={<Button label={t('wishlists.new')} icon="pi pi-plus" onClick={openCreate} />}
+      />
+      {!list.initial && !list.failed && (
+        <OnboardingCard wishlistTotal={list.total} onCreateWishlist={openCreate} />
+      )}
+      {list.failed ? (
+        <ErrorState onRetry={list.reload} />
+      ) : list.initial ? (
+        <ListSkeleton />
+      ) : (
       <div className="card-grid">
         {list.items.map((wishlist) => (
           <Card
@@ -90,10 +109,8 @@ export function MyWishlistsPage() {
             />
           </Card>
         ))}
-        {list.total === 0 && !list.loading && (
-          <p className="muted">{t('wishlists.empty')}</p>
-        )}
       </div>
+      )}
       <ListControls
         total={list.total}
         limit={list.limit}

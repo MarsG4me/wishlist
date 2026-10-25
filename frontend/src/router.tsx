@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
+import ErrorBoundary from './components/ErrorBoundary'
 import { AppShell } from './components/layout/AppShell'
 import { MyWishlistsPage } from './pages/MyWishlistsPage'
 import { WishlistDetailPage } from './pages/WishlistDetailPage'
@@ -12,6 +13,12 @@ import { ProfilePage } from './pages/ProfilePage'
 import { AdminPage } from './pages/AdminPage'
 
 export const router = createBrowserRouter([
+  { path: '/join/:code', element: (
+      <ErrorBoundary>
+        <JoinGroupPage />
+      </ErrorBoundary>
+    ),
+  },
   {
     element: <AppShell />,
     children: [
@@ -22,7 +29,6 @@ export const router = createBrowserRouter([
       { path: '/groups/:id', element: <GroupDetailPage /> },
       { path: '/groups/:groupId/wishlists/:id', element: <SharedWishlistPage /> },
       { path: '/claims', element: <MyClaimsPage /> },
-      { path: '/join/:code', element: <JoinGroupPage /> },
       { path: '/profile', element: <ProfilePage /> },
       { path: '/admin', element: <AdminPage /> },
     ],

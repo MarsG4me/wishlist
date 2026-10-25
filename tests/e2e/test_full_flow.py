@@ -41,14 +41,14 @@ def test_full_flow(as_user):
     group_card.get_by_role("link", name=GROUP_NAME).click()
 
     alice.get_by_role("tab", name="Invites").click()
-    alice.get_by_role("button", name="New invite").click()
+    alice.get_by_role("button", name="New invite").first.click()
     invite_link = alice.locator(".invite-code-box code").inner_text(timeout=10_000)
     assert "/join/" in invite_link
     alice.keyboard.press("Escape")
 
     # --- alice shares the wishlist into the group ---
     alice.get_by_role("tab", name="Shared wishlists").click()
-    alice.get_by_role("button", name="Share wishlist").click()
+    alice.get_by_role("button", name="Share wishlist").first.click()
     alice.get_by_role("button", name="Select one of my wishlists").click()
     alice.get_by_role("option", name=LIST_NAME).click()
     alice.get_by_role("button", name="Add", exact=True).click()
@@ -57,6 +57,7 @@ def test_full_flow(as_user):
     # --- bob joins via the invite link and claims the wish ---
     bob: Page = as_user("bob")
     bob.goto(invite_link)
+    bob.get_by_role("button", name="Join group").click()
     expect(bob.get_by_role("tab", name="Shared wishlists")).to_be_visible(timeout=15_000)
     shared_card = bob.locator(".p-card", has_text=LIST_NAME)
     expect(shared_card).to_be_visible()

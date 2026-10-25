@@ -8,6 +8,8 @@ import de.marsg.wishlist.endpoints.dto.users.UpdateLocaleDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdatePasswordDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateTierDTO;
 import de.marsg.wishlist.endpoints.dto.users.UpdateUserDTO;
+import de.marsg.wishlist.endpoints.dto.users.ReturnUserExportDTO;
+import de.marsg.wishlist.endpoints.services.UserExportService;
 import de.marsg.wishlist.endpoints.services.UserService;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
@@ -15,10 +17,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -34,9 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final UserExportService exportService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, UserExportService exportService) {
         this.userService = userService;
+        this.exportService = exportService;
     }
 
     @GetMapping("/me")
@@ -52,12 +57,11 @@ public class UserController {
     }
 
     @PatchMapping("/me/email")
-    @Operation(summary = "Change email (= username): applied in Keycloak first, then stored. "
+    @Operation(summary = "Change email (= username): current password verified, applied in Keycloak first, then stored. "
             + "Rejected for accounts signing in through an external provider")
-    public ReturnOwnUserDTO updateEmail(AuthenticatedUser user, @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody UpdateEmailDTO body) {
+    public ReturnOwnUserDTO updateEmail(AuthenticatedUser user, @Valid @RequestBody UpdateEmailDTO body) {
         assertLocalAccount(user);
-        return userService.updateEmail(user.userId(), jwt.getTokenValue(), body.email());
+        return userService.updateEmail(user.userId(), body.currentPassword(), body.email());
     }
 
     @PatchMapping("/me/locale")
@@ -85,9 +89,18 @@ public class UserController {
 
     @DeleteMapping("/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Soft-delete own account (restorable by logging in within 30 days)")
+    @Operation(summary = "Soft-delete own account and leave all groups (restorable by a fresh login within 30 days)")
     public void deleteMe(AuthenticatedUser user) {
-        userService.softDeleteOwnUser(user.userId());
+        userService.softDeleteUser(user.userId());
+    }
+
+    @GetMapping("/me/export")
+    @Operation(summary = "Download all personal data of the own account as JSON (GDPR Art. 15/20)")
+    public ResponseEntity<ReturnUserExportDTO> exportMe(AuthenticatedUser user) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename("wishlist-export.json").build().toString())
+                .body(exportService.export(user.userId()));
     }
 
     @GetMapping("/{id}")

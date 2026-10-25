@@ -8,7 +8,10 @@ import type { ListResponse, PageQuery, SharedWish, Wishlist } from '../api/types
 import { ClaimControls } from '../components/ClaimButton'
 import { ListControls } from '../components/ListControls'
 import { useApiToast } from '../hooks/useApiToast'
-import { usePagedList } from '../hooks/usePagedList'
+import { useListStatus } from '../hooks/useListStatus'
+import { EmptyState } from '../components/EmptyState'
+import { ErrorState, ListSkeleton, PageHeader } from '../components/PageStates'
+import WishLink from '../components/WishLink'
 import { useT } from '../i18n'
 
 /** Group-member view of a shared wishlist: shows claims and lets members claim. */
@@ -19,7 +22,7 @@ export function SharedWishlistPage() {
   const t = useT()
 
   const fetcher = useCallback((page: PageQuery) => listWishes(id!, page), [id])
-  const list = usePagedList<SharedWish>(
+  const list = useListStatus<SharedWish>(
     fetcher as (page: PageQuery) => Promise<ListResponse<SharedWish>>,
     showError,
   )
@@ -33,15 +36,24 @@ export function SharedWishlistPage() {
       <p>
         <Link to={`/groups/${groupId}`}>{t('groups.backToGroup')}</Link>
       </p>
-      <div className="page-header">
-        <h1>{wishlist?.name ?? '…'}</h1>
-      </div>
+      <PageHeader title={wishlist?.name ?? '…'} />
+      {list.failed ? (
+        <ErrorState onRetry={list.reload} />
+      ) : list.initial ? (
+        <ListSkeleton />
+      ) : list.total === 0 ? (
+        <EmptyState
+          icon="pi pi-inbox"
+          title={t('empty.shared.title')}
+          text={t('empty.shared.text')}
+        />
+      ) : (
       <div className="card-grid">
         {list.items.map((wish) => (
           <Card
             key={wish.id}
             className="entity-card"
-            title={<Link to={`/wishes/${wish.id}`}>{wish.name}</Link>}
+            title={<Link to={`/wishes/${wish.id}`} state={{ nav: 'groups' }}>{wish.name}</Link>}
           >
             {wish.description && <p>{wish.description}</p>}
             <Tag
@@ -57,16 +69,14 @@ export function SharedWishlistPage() {
             />
             <div className="wish-card-links">
               {wish.links.map((link) => (
-                <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
-                  {link.label || new URL(link.url).hostname}
-                </a>
+                <WishLink key={link.url} url={link.url} label={link.label} />
               ))}
             </div>
             <ClaimControls wish={wish} onChanged={list.reload} />
           </Card>
         ))}
-        {list.total === 0 && !list.loading && <p className="muted">{t('wishes.sharedEmpty')}</p>}
       </div>
+      )}
       <ListControls
         total={list.total}
         limit={list.limit}

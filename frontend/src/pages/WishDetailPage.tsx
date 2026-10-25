@@ -8,6 +8,7 @@ import { deleteWish, getWish, updateWish, type WishInput } from '../api/wishes'
 import type { OwnWish, SharedWish } from '../api/types'
 import { ClaimControls } from '../components/ClaimButton'
 import { WishFormDialog } from '../components/WishFormDialog'
+import WishLink from '../components/WishLink'
 import { CardActions } from '../components/CardActions'
 import { useApiToast } from '../hooks/useApiToast'
 import { ApiError } from '../api/errors'
@@ -125,9 +126,7 @@ export function WishDetailPage() {
         />
         <div className="wish-card-links">
           {wish.links.map((link) => (
-            <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
-              {link.label || new URL(link.url).hostname}
-            </a>
+            <WishLink key={link.url} url={link.url} label={link.label} />
           ))}
         </div>
         {isShared(wish) && <ClaimControls wish={wish} onChanged={reload} />}

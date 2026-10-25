@@ -15,6 +15,7 @@ import de.marsg.wishlist.jpa.repositories.GroupInviteRepository;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
 import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -80,7 +81,9 @@ public class MembershipService {
     @Transactional(readOnly = true)
     public ReturnListDTO<ReturnMembershipDTO> list(UUID userId, UUID groupId, Integer limit, Integer offset) {
         GroupEntity group = groupService.requireGroup(groupId);
-        accessService.assertGroupMember(userId, group);
+        if (!membershipRepository.existsByGroupsIdAndUsersId(groupId, userId)) {
+            throw new ApiException(ErrorCode.GROUP_NOT_FOUND);
+        }
         Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.ASC, "id"));
         Page<GroupMembershipEntity> page = membershipRepository.findByGroupsId(groupId, pageable);
         Map<UUID, ReturnSimpleUserDTO> users = userRepository.findAllById(
@@ -92,7 +95,7 @@ public class MembershipService {
                 .filter(membership -> users.containsKey(membership.getUsersId()))
                 .map(membership -> ReturnMembershipDTO.from(membership,
                         users.get(membership.getUsersId()),
-                        group.getUsersId().equals(membership.getUsersId())))
+                        membership.getUsersId().equals(group.getUsersId())))
                 .toList());
     }
 
@@ -100,8 +103,8 @@ public class MembershipService {
     @Transactional
     public ReturnMembershipDTO setAdmin(UUID userId, UUID membershipId, boolean isAdmin) {
         GroupMembershipEntity membership = requireMembership(membershipId);
-        GroupEntity group = groupService.requireGroup(membership.getGroupsId());
-        accessService.assertGroupAdmin(userId, group);
+        GroupEntity group = lockGroup(membership.getGroupsId());
+        assertAdminHidingMembership(userId, group);
         if (!isAdmin && membership.isAdmin() && isLastAdmin(group.getId())) {
             throw new ApiException(ErrorCode.LAST_ADMIN_CANNOT_BE_DEMOTED);
         }
@@ -109,7 +112,7 @@ public class MembershipService {
         UserEntity member = userRepository.findById(membership.getUsersId())
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
         return ReturnMembershipDTO.from(membership, ReturnSimpleUserDTO.from(member),
-                group.getUsersId().equals(membership.getUsersId()));
+                membership.getUsersId().equals(group.getUsersId()));
     }
 
     /**
@@ -119,13 +122,71 @@ public class MembershipService {
     @Transactional
     public void remove(UUID userId, UUID membershipId) {
         GroupMembershipEntity membership = requireMembership(membershipId);
-        GroupEntity group = groupService.requireGroup(membership.getGroupsId());
+        GroupEntity group = lockGroup(membership.getGroupsId());
         if (!membership.getUsersId().equals(userId)) {
-            accessService.assertGroupAdmin(userId, group);
+            assertAdminHidingMembership(userId, group);
         }
         if (membership.isAdmin() && isLastAdmin(group.getId())) {
             throw new ApiException(ErrorCode.LAST_ADMIN_CANNOT_LEAVE);
         }
+        detach(membership, group);
+        if (membership.getUsersId().equals(group.getUsersId())) {
+            transferCreator(group, membership.getUsersId());
+        }
+        log.info("User {} removed membership {} from group {}", userId, membershipId, group.getId());
+    }
+
+    /**
+     * Account deletion: leaves every group. A creator or last admin hands creator role and
+     * admin to another admin, else the oldest member; a group left empty is soft-deleted.
+     */
+    @Transactional
+    public void removeAllMembershipsOf(UUID userId) {
+        // ascending group order: two accounts leaving shared groups cannot lock them crosswise
+        List<GroupMembershipEntity> owned = membershipRepository.findByUsersId(userId).stream()
+                .sorted(Comparator.comparing(GroupMembershipEntity::getGroupsId)).toList();
+        for (GroupMembershipEntity own : owned) {
+            GroupEntity group = membershipRepository.findGroupForUpdate(own.getGroupsId()).orElse(null);
+            if (group == null) {
+                continue;
+            }
+            List<GroupMembershipEntity> others = membershipRepository.findByGroupsId(group.getId()).stream()
+                    .filter(member -> !member.getUsersId().equals(userId))
+                    .sorted(Comparator.comparing(GroupMembershipEntity::getId))
+                    .toList();
+            if (others.isEmpty()) {
+                softDeleteEmptyGroup(own, group);
+                continue;
+            }
+            boolean isCreator = userId.equals(group.getUsersId());
+            boolean lastAdmin = own.isAdmin() && others.stream().noneMatch(GroupMembershipEntity::isAdmin);
+            GroupMembershipEntity successor = others.stream().filter(GroupMembershipEntity::isAdmin)
+                    .findFirst().orElse(others.get(0));
+            if (isCreator || lastAdmin) {
+                successor.setAdmin(true);
+            }
+            detach(own, group);
+            if (isCreator) {
+                group.transferCreatorTo(successor.getUsersId());
+            }
+            log.info("User {} left group {} on account deletion", userId, group.getId());
+        }
+    }
+
+    /** Nobody is left to hand the group to: delete it, which also ends every share it carried. */
+    private void softDeleteEmptyGroup(GroupMembershipEntity own, GroupEntity group) {
+        List<UUID> sharedWishlists = shareRepository.findByGroupsId(group.getId()).stream()
+                .map(GroupWishlistShareEntity::getWishlistsId)
+                .toList();
+        membershipRepository.delete(own);
+        group.markDeleted();
+        membershipRepository.flush();
+        claimService.purgeParticipationsWithoutAccess(sharedWishlists);
+        log.info("Soft-deleted group {} left without members", group.getId());
+    }
+
+    /** Deletes the membership and the leaver's shares in the group, then revokes stale claims. */
+    private void detach(GroupMembershipEntity membership, GroupEntity group) {
         // taken before the change: the leaver loses sight of all of them, and the rest of
         // the group loses sight of the leaver's own ones
         List<UUID> sharedWishlists = shareRepository.findByGroupsId(group.getId()).stream()
@@ -137,15 +198,25 @@ public class MembershipService {
                 shareRepository.findSharesOfUserInGroup(membership.getUsersId(), group.getId()));
         shareRepository.flush();
         claimService.purgeParticipationsWithoutAccess(sharedWishlists);
-        if (group.getUsersId().equals(membership.getUsersId())) {
-            transferCreator(group, membership.getUsersId());
+    }
+
+    /** Row lock on the group so concurrent admin changes cannot both pass the last-admin rule. */
+    private GroupEntity lockGroup(UUID groupId) {
+        return membershipRepository.findGroupForUpdate(groupId)
+                .orElseThrow(() -> new ApiException(ErrorCode.MEMBERSHIP_NOT_FOUND));
+    }
+
+    /** Non-members get the unknown-id answer, so membership ids cannot be probed. */
+    private void assertAdminHidingMembership(UUID userId, GroupEntity group) {
+        if (!membershipRepository.existsByGroupsIdAndUsersId(group.getId(), userId)) {
+            throw new ApiException(ErrorCode.MEMBERSHIP_NOT_FOUND);
         }
-        log.info("User {} removed membership {} from group {}", userId, membershipId, group.getId());
+        accessService.assertGroupAdmin(userId, group);
     }
 
     /**
-     * The creator column is a NOT NULL FK that cascades on account purge; hand it to a
-     * remaining admin when the creator leaves so the group survives their account deletion.
+     * The creator column is nullable now, but a creator who left should still hand it to a
+     * remaining admin so the group keeps an informational owner.
      */
     private void transferCreator(GroupEntity group, UUID leavingUserId) {
         membershipRepository.findByGroupsId(group.getId()).stream()
@@ -167,7 +238,7 @@ public class MembershipService {
         UserEntity member = userRepository.findById(membership.getUsersId())
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
         return ReturnMembershipDTO.from(membership, ReturnSimpleUserDTO.from(member),
-                group.getUsersId().equals(membership.getUsersId()));
+                membership.getUsersId().equals(group.getUsersId()));
     }
 
     private GroupMembershipEntity requireMembership(UUID membershipId) {

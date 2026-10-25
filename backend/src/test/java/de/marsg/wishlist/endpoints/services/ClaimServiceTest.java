@@ -68,6 +68,15 @@ class ClaimServiceTest {
         return wish;
     }
 
+    private void mockClaimVisibleToRequester() {
+        WishEntity wish = mock(WishEntity.class);
+        when(wish.getWishlistsId()).thenReturn(wishlistId);
+        when(wishRepository.findById(wishId)).thenReturn(Optional.of(wish));
+        WishlistEntity wishlist = mockWishlist(ownerId);
+        when(wishlist.getId()).thenReturn(wishlistId);
+        when(accessService.canViewAsSharedWishlist(requester, wishlistId)).thenReturn(true);
+    }
+
     private WishlistEntity mockWishlist(UUID owner) {
         WishlistEntity wishlist = mock(WishlistEntity.class);
         when(wishlist.getUsersId()).thenReturn(owner);
@@ -147,7 +156,8 @@ class ClaimServiceTest {
         UUID claimId = UUID.randomUUID();
         ClaimEntity claim = new ClaimEntity(wishId, ownerId);
         when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
-        mockWish(null);
+        WishEntity wish = mockWish(null);
+        when(wishRepository.findById(wishId)).thenReturn(Optional.of(wish));
         WishlistEntity wishlist = mockWishlist(ownerId);
         when(wishlist.getId()).thenReturn(wishlistId);
         when(accessService.canViewAsSharedWishlist(requester, wishlistId)).thenReturn(true);
@@ -165,7 +175,8 @@ class ClaimServiceTest {
         ClaimEntity claim = new ClaimEntity(wishId, ownerId);
         claim.setShared(true);
         when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
-        mockWish(null);
+        WishEntity wish = mockWish(null);
+        when(wishRepository.findById(wishId)).thenReturn(Optional.of(wish));
         WishlistEntity wishlist = mockWishlist(ownerId);
         when(wishlist.getId()).thenReturn(wishlistId);
         when(accessService.canViewAsSharedWishlist(requester, wishlistId)).thenReturn(true);
@@ -183,11 +194,29 @@ class ClaimServiceTest {
         UUID claimId = UUID.randomUUID();
         ClaimEntity claim = new ClaimEntity(wishId, ownerId);
         when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+        mockClaimVisibleToRequester();
 
         assertThatThrownBy(() -> claimService.setShared(requester, claimId, true))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOT_CLAIM_OWNER));
         assertThat(claim.isShared()).isFalse();
+    }
+
+    @Test
+    void aClaimOnAWishlistTheCallerCannotViewIsNotFound() {
+        UUID claimId = UUID.randomUUID();
+        ClaimEntity claim = new ClaimEntity(wishId, requester);
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+        WishEntity wish = mock(WishEntity.class);
+        when(wish.getWishlistsId()).thenReturn(wishlistId);
+        when(wishRepository.findById(wishId)).thenReturn(Optional.of(wish));
+        WishlistEntity wishlist = mockWishlist(ownerId);
+        when(wishlist.getId()).thenReturn(wishlistId);
+        when(accessService.canViewAsSharedWishlist(requester, wishlistId)).thenReturn(false);
+
+        assertThatThrownBy(() -> claimService.setShared(requester, claimId, true))
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CLAIM_NOT_FOUND));
     }
 
     /** Leaving must also end the control over the claim, not just the participation. */
@@ -196,6 +225,7 @@ class ClaimServiceTest {
         UUID claimId = UUID.randomUUID();
         ClaimEntity claim = new ClaimEntity(wishId, requester);
         when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+        mockClaimVisibleToRequester();
         when(participantRepository.existsById(new ClaimParticipantId(claimId, requester)))
                 .thenReturn(false);
 
@@ -210,6 +240,7 @@ class ClaimServiceTest {
         UUID claimId = UUID.randomUUID();
         ClaimEntity claim = new ClaimEntity(wishId, requester);
         when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+        mockClaimVisibleToRequester();
         when(participantRepository.existsById(new ClaimParticipantId(claimId, requester)))
                 .thenReturn(true);
         when(participantRepository.findByIdClaimsId(claim.getId())).thenReturn(List.of());

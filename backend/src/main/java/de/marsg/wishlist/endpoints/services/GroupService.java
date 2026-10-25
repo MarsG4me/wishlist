@@ -23,6 +23,7 @@ import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -83,14 +84,13 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public ReturnGroupDTO get(UUID userId, UUID groupId) {
-        GroupEntity group = requireGroup(groupId);
-        accessService.assertGroupMember(userId, group);
+        GroupEntity group = requireGroupAsMember(userId, groupId);
         return ReturnGroupDTO.from(group, accessService.isGroupAdmin(userId, groupId));
     }
 
     @Transactional
     public ReturnGroupDTO update(UUID userId, UUID groupId, CreateUpdateGroupDTO dto) {
-        GroupEntity group = requireGroup(groupId);
+        GroupEntity group = requireGroupAsMember(userId, groupId);
         accessService.assertGroupAdmin(userId, group);
         group.setName(dto.name());
         group.setDescription(dto.description());
@@ -100,7 +100,7 @@ public class GroupService {
     /** Deleting the group ends every share it carried, so the claims behind them go too. */
     @Transactional
     public void softDelete(UUID userId, UUID groupId) {
-        GroupEntity group = requireGroup(groupId);
+        GroupEntity group = requireGroupAsMember(userId, groupId);
         accessService.assertGroupAdmin(userId, group);
         List<UUID> sharedWishlists = shareRepository.findByGroupsId(groupId).stream()
                 .map(GroupWishlistShareEntity::getWishlistsId)
@@ -114,8 +114,7 @@ public class GroupService {
     @Transactional(readOnly = true)
     public ReturnListDTO<ReturnSharedWishlistDTO> listShares(UUID userId, UUID groupId, Integer limit,
             Integer offset) {
-        GroupEntity group = requireGroup(groupId);
-        accessService.assertGroupMember(userId, group);
+        GroupEntity group = requireGroupAsMember(userId, groupId);
         Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
         Page<GroupWishlistShareEntity> page = shareRepository.findByGroupsId(groupId, pageable);
         List<GroupWishlistShareEntity> shares = page.getContent();
@@ -140,8 +139,7 @@ public class GroupService {
     @Transactional(readOnly = true)
     public ReturnListDTO<ReturnWishlistDTO> listShareableWishlists(UUID userId, UUID groupId,
             Integer limit, Integer offset) {
-        GroupEntity group = requireGroup(groupId);
-        accessService.assertGroupMember(userId, group);
+        GroupEntity group = requireGroupAsMember(userId, groupId);
         Pageable pageable = PageParams.of(limit, offset, Sort.by(Sort.Direction.DESC, "id"));
         return ReturnListDTO.of(wishlistRepository.findShareableIntoGroup(userId, groupId, pageable),
                 ReturnWishlistDTO::from);
@@ -150,10 +148,10 @@ public class GroupService {
     /** Sharing requires owning the wishlist AND being a member of the target group. */
     @Transactional
     public void share(UUID userId, UUID groupId, UUID wishlistId) {
-        GroupEntity group = requireGroup(groupId);
-        accessService.assertGroupMember(userId, group);
+        GroupEntity group = requireGroupAsMember(userId, groupId);
         WishlistEntity wishlist = wishlistRepository.findById(wishlistId)
                 .orElseThrow(() -> new ApiException(ErrorCode.WISHLIST_NOT_FOUND));
+        accessService.assertCanViewWishlist(userId, wishlist);
         accessService.assertWishlistOwner(userId, wishlist);
         if (shareRepository.existsByGroupsIdAndWishlistsId(groupId, wishlistId)) {
             throw new ApiException(ErrorCode.WISHLIST_ALREADY_SHARED);
@@ -165,7 +163,7 @@ public class GroupService {
     /** Unshare: the wishlist owner or a group admin. */
     @Transactional
     public void unshare(UUID userId, UUID groupId, UUID wishlistId) {
-        GroupEntity group = requireGroup(groupId);
+        GroupEntity group = requireGroupAsMember(userId, groupId);
         GroupWishlistShareEntity share = shareRepository.findByGroupsIdAndWishlistsId(groupId, wishlistId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SHARE_NOT_FOUND));
         boolean isWishlistOwner = wishlistRepository.findById(wishlistId)
@@ -179,6 +177,20 @@ public class GroupService {
         // members of this group lose sight of the wishlist unless another share still covers it
         claimService.purgeParticipationsWithoutAccess(List.of(wishlistId));
         log.info("User {} removed share of wishlist {} from group {}", userId, wishlistId, groupId);
+    }
+
+    /** Group lookup for a caller who must be a member; a non-member sees GROUP_NOT_FOUND. */
+    private GroupEntity requireGroupAsMember(UUID userId, UUID groupId) {
+        GroupEntity group = requireGroup(groupId);
+        if (!membershipRepository.existsByGroupsIdAndUsersId(groupId, userId)) {
+            throw new ApiException(ErrorCode.GROUP_NOT_FOUND);
+        }
+        return group;
+    }
+
+    /** Live (not soft-deleted) group, if any. */
+    Optional<GroupEntity> findGroup(UUID groupId) {
+        return groupRepository.findById(groupId);
     }
 
     GroupEntity requireGroup(UUID groupId) {

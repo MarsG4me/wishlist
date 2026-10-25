@@ -30,7 +30,7 @@ cd backend && mvn spring-boot:run    # http://localhost:6543, Swagger at /docs/a
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-Keycloak: http://localhost:8180 (admin/admin). Realm `wishlist-dev` is imported on first start.
+Keycloak: http://localhost:8180 (admin/admin). Realm `wishlist-dev` is imported on first start. Self-registration is enabled in the dev realm.
 
 Dev users (password `test`): `alice@test.local`, `bob@test.local`, `carol@test.local`,
 `admin@test.local` (has the `admin` realm role).
@@ -60,7 +60,7 @@ docker compose up -d --build            # publishes 127.0.0.1:8080 for the outer
 | Inside the image | |
 |---|---|
 | nginx | port 8080; SPA with SPA-fallback, `/v1/**` proxied, `/docs/**` unrouted (falls back to the SPA) |
-| Rate limits | 20r/s per client on `/v1/**`; 12r/min on `/v1/users/me/password`, `/v1/users/me/email`, `/v1/memberships/join` |
+| Rate limits | 20r/s per client on `/v1/**`; 12r/min on `/v1/users/me/password`, `/v1/users/me/email`, `/v1/memberships/join`, `/v1/invites/**` (incl. the public invite preview) |
 | `/health` | private networks + loopback only — do not proxy it from the outer nginx |
 | Backend | `SPRING_PROFILES_ACTIVE=prod` (Swagger and the OpenAPI spec off), runs as uid 10001 |
 
@@ -83,7 +83,11 @@ container's environment (`KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`,
 | `KEYCLOAK_ISSUER_URI` | `http://localhost:8180/realms/wishlist-dev` |
 | `KEYCLOAK_ACCOUNT_URL` | `http://localhost:8180/realms/wishlist-dev/account` |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` |
-| `PURGE_ENABLED` | `false` (opt-in scheduled purge of soft-deleted rows > 30 days) |
+| `PURGE_ENABLED` | `true` (scheduled purge of soft-deleted rows > 30 days; `false` disables) |
+| `LINK_BLOCKLIST_ENABLED` | `true` (download domain blocklists at start and daily; wish links to listed domains are rejected) |
+| `LINK_BLOCKLIST_URLS` | comma-separated hosts-file or domain-per-line lists (default: URLhaus filter + Block List Project phishing/malware/scam/fraud/porn/abuse) |
+| `LINK_ALLOWED_DOMAINS` | comma-separated shop domains (and subdomains) that skip all link checks (default: major shops, see `application.yml`) |
+| `WEB_RISK_API_KEY` | empty (set to enable Google Web Risk lookups for non-allowlisted links; fails open) |
 
 ## Roles
 

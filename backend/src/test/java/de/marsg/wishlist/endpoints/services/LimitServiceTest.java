@@ -8,6 +8,7 @@ import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.repositories.GroupRepository;
+import de.marsg.wishlist.jpa.repositories.UserRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.UUID;
@@ -27,6 +28,8 @@ class LimitServiceTest {
     private WishlistRepository wishlistRepository;
     @Mock
     private WishRepository wishRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private LimitService limitService;
 
@@ -34,7 +37,8 @@ class LimitServiceTest {
 
     @BeforeEach
     void setUp() {
-        limitService = new LimitService(groupRepository, wishlistRepository, wishRepository);
+        limitService = new LimitService(groupRepository, wishlistRepository, wishRepository,
+                userRepository);
     }
 
     @Test

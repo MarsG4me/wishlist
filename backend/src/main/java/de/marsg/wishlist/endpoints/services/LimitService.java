@@ -4,6 +4,7 @@ import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
 import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.repositories.GroupRepository;
+import de.marsg.wishlist.jpa.repositories.UserRepository;
 import de.marsg.wishlist.jpa.repositories.WishRepository;
 import de.marsg.wishlist.jpa.repositories.WishlistRepository;
 import java.util.UUID;
@@ -20,27 +21,33 @@ public class LimitService {
     private final GroupRepository groupRepository;
     private final WishlistRepository wishlistRepository;
     private final WishRepository wishRepository;
+    private final UserRepository userRepository;
 
     public LimitService(GroupRepository groupRepository, WishlistRepository wishlistRepository,
-            WishRepository wishRepository) {
+            WishRepository wishRepository, UserRepository userRepository) {
+        this.userRepository = userRepository;
         this.groupRepository = groupRepository;
         this.wishlistRepository = wishlistRepository;
         this.wishRepository = wishRepository;
     }
 
+    /** Checks run under a parent-row lock, so they must be called inside the caller's transaction. */
     public void assertCanCreateGroup(UUID userId, UserTier tier) {
+        userRepository.findByIdForUpdate(userId);
         if (groupRepository.countByUsersId(userId) >= limitFor(MAX_OWNED_GROUPS, tier)) {
             throw new ApiException(ErrorCode.GROUP_LIMIT_REACHED);
         }
     }
 
     public void assertCanCreateWishlist(UUID userId, UserTier tier) {
+        userRepository.findByIdForUpdate(userId);
         if (wishlistRepository.countByUsersId(userId) >= limitFor(MAX_WISHLISTS, tier)) {
             throw new ApiException(ErrorCode.WISHLIST_LIMIT_REACHED);
         }
     }
 
     public void assertCanAddWish(UUID wishlistId, UserTier ownerTier) {
+        wishlistRepository.findByIdForUpdate(wishlistId);
         if (wishRepository.countByWishlistsId(wishlistId) >= limitFor(MAX_WISHES_PER_LIST, ownerTier)) {
             throw new ApiException(ErrorCode.WISH_LIMIT_REACHED);
         }

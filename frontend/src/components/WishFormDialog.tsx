@@ -15,6 +15,26 @@ interface Props {
   onHide: () => void
 }
 
+/** Trims and prefixes https:// unless a scheme:// or a known non-http scheme (kept, then rejected) leads. */
+const normalizeUrl = (raw: string): string => {
+  const url = raw.trim()
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) || /^(javascript|data|mailto|tel|sms|file|vbscript|blob):/i.test(url)
+  return hasScheme ? url : `https://${url}`
+}
+
+/** Returns an i18n error for a non-empty link that is not an absolute http(s) URL <= 2048 chars. */
+const linkError = (raw: string, t: ReturnType<typeof useT>): string | null => {
+  if (raw.trim() === '') return null
+  const url = normalizeUrl(raw)
+  if (url.length > 2048) return t('wishes.linkTooLong')
+  try {
+    const { protocol } = new URL(url)
+    return protocol === 'http:' || protocol === 'https:' ? null : t('wishes.linkInvalid')
+  } catch {
+    return t('wishes.linkInvalid')
+  }
+}
+
 export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -35,14 +55,20 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
   const setLink = (index: number, patch: Partial<WishLink>) =>
     setLinks(links.map((link, i) => (i === index ? { ...link, ...patch } : link)))
 
+  const linkErrors = links.map((link) => linkError(link.url, t))
+  const invalid = linkErrors.some(Boolean)
+
   const save = async () => {
+    if (invalid) return
     setSaving(true)
     try {
       await onSave({
         name,
         description: description || null,
         quantity: unlimited ? null : 1,
-        links: links.filter((link) => link.url.trim() !== ''),
+        links: links
+          .filter((link) => link.url.trim() !== '')
+          .map((link) => ({ ...link, url: normalizeUrl(link.url) })),
       })
       onHide()
     } finally {
@@ -81,10 +107,13 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
       <div className="form-field">
         <label>{t('wishes.links')}</label>
         {links.map((link, i) => (
-          <div className="link-editor-row" key={i}>
+          <div className="link-editor-row" key={i} style={{ flexWrap: 'wrap' }}>
             <InputText
+              type="url"
+              inputMode="url"
               placeholder="https://…"
               value={link.url}
+              invalid={!!linkErrors[i]}
               onChange={(e) => setLink(i, { url: e.target.value })}
             />
             <InputText
@@ -98,6 +127,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
               text
               onClick={() => setLinks(links.filter((_, j) => j !== i))}
             />
+            {linkErrors[i] && <small className="p-error" style={{ flexBasis: '100%' }}>{linkErrors[i]}</small>}
           </div>
         ))}
         <Button
@@ -111,7 +141,7 @@ export function WishFormDialog({ visible, wish, onSave, onHide }: Props) {
       <Button
         label={t('common.save')}
         icon="pi pi-check"
-        disabled={!name.trim() || saving}
+        disabled={!name.trim() || saving || invalid}
         onClick={save}
       />
     </Dialog>

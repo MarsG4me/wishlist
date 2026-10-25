@@ -4,6 +4,7 @@ import { Button } from 'primereact/button'
 import { InputSwitch } from 'primereact/inputswitch'
 import { Tag } from 'primereact/tag'
 import type { Membership } from '../api/types'
+import { EmptyState } from './EmptyState'
 import { useT } from '../i18n'
 
 interface Props {
@@ -22,7 +23,7 @@ export function MemberTable({ members, ownUserId, canManage, onToggleAdmin, onRe
   const t = useT()
 
   return (
-    <DataTable value={members} dataKey="id" emptyMessage={t('members.empty')}>
+    <DataTable value={members} dataKey="id" emptyMessage={<EmptyState icon="pi pi-users" title={t('empty.members.title')} text={t('empty.members.text')} />}>
       <Column field="user.displayname" header={t('members.member')} />
       <Column
         header={t('members.role')}

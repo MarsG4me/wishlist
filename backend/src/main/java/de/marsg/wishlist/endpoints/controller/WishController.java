@@ -47,7 +47,8 @@ public class WishController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a wish with links (wishlist owner, limit-checked)")
     public ReturnOwnWishDTO create(AuthenticatedUser user, @Valid @RequestBody CreateWishDTO body) {
-        return wishService.create(user.userId(), user.tier(), body);
+        wishService.assertMayCreate(user.userId(), body.wishlistId());
+        return wishService.create(user.userId(), user.tier(), body, wishService.prepareLinks(body.links()));
     }
 
     @GetMapping("/{id}")
@@ -62,7 +63,8 @@ public class WishController {
             + "existing_claims_affected")
     public ReturnUpdatedWishDTO update(AuthenticatedUser user, @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateWishDTO body) {
-        return wishService.update(user.userId(), id, body);
+        wishService.assertMayEdit(user.userId(), id);
+        return wishService.update(user.userId(), id, body, wishService.prepareLinks(body.links()));
     }
 
     @DeleteMapping("/{id}")

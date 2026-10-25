@@ -33,6 +33,24 @@ public class AccessService {
         }
     }
 
+    /** Owner passes; a viewer gets NOT_WISHLIST_OWNER; everyone else {@code hidden}, so ids do not leak. */
+    public void assertWishlistOwnerOrHide(UUID userId, WishlistEntity wishlist, ErrorCode hidden) {
+        if (isWishlistOwner(userId, wishlist)) {
+            return;
+        }
+        throw new ApiException(canViewAsSharedWishlist(userId, wishlist.getId())
+                ? ErrorCode.NOT_WISHLIST_OWNER : hidden);
+    }
+
+    /** Admin passes; a plain member gets NOT_GROUP_ADMIN; a non-member GROUP_NOT_FOUND. */
+    public void assertGroupAdminOrHide(UUID userId, GroupEntity group) {
+        if (isGroupAdmin(userId, group.getId())) {
+            return;
+        }
+        throw new ApiException(membershipRepository.existsByGroupsIdAndUsersId(group.getId(), userId)
+                ? ErrorCode.NOT_GROUP_ADMIN : ErrorCode.GROUP_NOT_FOUND);
+    }
+
     /** Owner, or member of at least one group the wishlist is shared into. */
     public void assertCanViewWishlist(UUID userId, WishlistEntity wishlist) {
         if (!isWishlistOwner(userId, wishlist)
@@ -47,7 +65,7 @@ public class AccessService {
 
     public void assertGroupMember(UUID userId, GroupEntity group) {
         if (!membershipRepository.existsByGroupsIdAndUsersId(group.getId(), userId)) {
-            throw new ApiException(ErrorCode.NOT_GROUP_MEMBER);
+            throw new ApiException(ErrorCode.GROUP_NOT_FOUND);
         }
     }
 

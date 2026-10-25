@@ -4,12 +4,14 @@ import de.marsg.wishlist.endpoints.dto.users.ReturnOwnUserDTO;
 import de.marsg.wishlist.endpoints.dto.users.ReturnSimpleUserDTO;
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import de.marsg.wishlist.jpa.entities.GroupWishlistShareEntity;
 import de.marsg.wishlist.jpa.entities.UserEntity;
 import de.marsg.wishlist.jpa.entities.UserLocale;
 import de.marsg.wishlist.jpa.entities.UserTier;
 import de.marsg.wishlist.jpa.repositories.GroupMembershipRepository;
 import de.marsg.wishlist.jpa.repositories.GroupWishlistShareRepository;
 import de.marsg.wishlist.jpa.repositories.UserRepository;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,15 +29,17 @@ public class UserService {
     private final GroupWishlistShareRepository shareRepository;
     private final KeycloakAccountClient keycloakAccountClient;
     private final ClaimService claimService;
+    private final MembershipService membershipService;
 
     public UserService(UserRepository userRepository, GroupMembershipRepository membershipRepository,
             GroupWishlistShareRepository shareRepository, KeycloakAccountClient keycloakAccountClient,
-            ClaimService claimService) {
+            ClaimService claimService, MembershipService membershipService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.shareRepository = shareRepository;
         this.keycloakAccountClient = keycloakAccountClient;
         this.claimService = claimService;
+        this.membershipService = membershipService;
     }
 
     @Transactional(readOnly = true)
@@ -50,17 +54,18 @@ public class UserService {
         return ReturnOwnUserDTO.from(user, identityProvider);
     }
 
-    /** Keycloak first; the DB copy is only written when Keycloak accepted the change. */
+    /** Password check, then Keycloak; the DB copy is only written when Keycloak accepted the change. */
     @Transactional
-    public ReturnOwnUserDTO updateEmail(UUID userId, String bearerToken, String newEmail) {
+    public ReturnOwnUserDTO updateEmail(UUID userId, String currentPassword, String newEmail) {
         UserEntity user = requireUser(userId);
+        keycloakAccountClient.verifyCurrentPassword(user.getEmail(), currentPassword);
         // checked up front so a taken address fails with a code instead of a constraint violation
         userRepository.findByEmailIncludingDeleted(newEmail)
                 .filter(existing -> !existing.getId().equals(userId))
                 .ifPresent(existing -> {
                     throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
                 });
-        keycloakAccountClient.updateEmail(bearerToken, newEmail);
+        keycloakAccountClient.updateEmail(user.getKeycloakId(), newEmail);
         user.setEmail(newEmail);
         try {
             // flushed here on purpose: the check above is not atomic, and a violation
@@ -98,14 +103,51 @@ public class UserService {
     }
 
     @Transactional
-    public void softDeleteOwnUser(UUID userId) {
-        UserEntity user = requireUser(userId);
+    public void softDeleteUser(UUID userId) {
+        softDelete(requireUser(userId));
+    }
+
+    /**
+     * Immediate erasure: soft-delete cleanup, then the DB row (cascading wishlists, wishes
+     * and claims) and the Keycloak account. A Keycloak failure rolls everything back.
+     */
+    @Transactional
+    public void eraseUserNow(UUID userId) {
+        UserEntity user = userRepository.findByIdIncludingDeleted(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        UUID keycloakId = user.getKeycloakId();
+        if (user.isDeleted()) {
+            releaseTies(userId);
+        } else {
+            softDelete(user);
+        }
+        userRepository.deleteHardById(userId);
+        keycloakAccountClient.deleteUser(keycloakId);
+        log.info("Erased user {}", userId);
+    }
+
+    private void softDelete(UserEntity user) {
+        UUID userId = user.getId();
         user.markDeleted();
+        releaseTies(userId);
+        log.info("Soft-deleted user {}", userId);
+    }
+
+    /** Leaves all groups, drops shares and claims of the account; idempotent, also for already deleted ones. */
+    @Transactional
+    public void releaseTies(UUID userId) {
+        // leave every group first: shares, claims and creator/admin handover as for a manual leave
+        membershipService.removeAllMembershipsOf(userId);
         // stop sharing immediately: a deleted account's wishlists disappear from every group
-        shareRepository.deleteAll(shareRepository.findSharesOfUser(userId));
+        List<GroupWishlistShareEntity> shares = shareRepository.findSharesOfUser(userId);
+        List<UUID> ownWishlists = shares.stream().map(GroupWishlistShareEntity::getWishlistsId)
+                .distinct().toList();
+        shareRepository.deleteAll(shares);
+        shareRepository.flush();
+        // other members' claims on those wishlists lose their basis too
+        claimService.purgeParticipationsWithoutAccess(ownWishlists);
         // and stop gifting: the claims would otherwise block wishes with an invisible claimer
         claimService.removeAllParticipationsOf(userId);
-        log.info("Soft-deleted user {}", userId);
     }
 
     /**

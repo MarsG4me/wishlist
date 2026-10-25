@@ -4,6 +4,9 @@ export const errorsEn: Record<string, string> = {
   UNAUTHENTICATED: 'Please log in again.',
   FORBIDDEN: 'You are not allowed to do that.',
   ROUTE_NOT_FOUND: 'This action is unknown.',
+  METHOD_NOT_ALLOWED: 'This action is not supported.',
+  UNSUPPORTED_MEDIA_TYPE: 'The request format is not supported.',
+  CONFLICT: 'That conflicts with existing data. Please try again.',
   USER_NOT_FOUND: 'User not found.',
   EMAIL_ALREADY_EXISTS:
     'An account with this email already exists. If you deleted it, sign in with your original login to reactivate it.',
@@ -30,6 +33,8 @@ export const errorsEn: Record<string, string> = {
   INVITE_EXPIRED: 'This invite has expired.',
   INVITE_REVOKED: 'This invite has been revoked.',
   INVITE_EXHAUSTED: 'This invite has no uses left.',
+  INVALID_LINK_URL: 'Links must be public http or https addresses.',
+  LINK_BLOCKED: 'This link was blocked by our safety checks.',
   CLAIM_NOT_FOUND: 'Claim not found.',
   CANNOT_CLAIM_OWN_WISH: 'You cannot claim your own wish.',
   ALREADY_CLAIMED: 'You already participate in a claim for this wish.',
@@ -38,5 +43,6 @@ export const errorsEn: Record<string, string> = {
   NOT_CLAIM_OWNER: 'Only the person who made this claim can change it.',
   INVALID_CREDENTIALS: 'The current password is incorrect.',
   KEYCLOAK_UPDATE_FAILED: 'The account update was rejected. Please try again.',
+  ACCOUNT_DELETED: 'This account has been deleted.',
   INTERNAL_ERROR: 'Something went wrong. Please try again later.',
 }

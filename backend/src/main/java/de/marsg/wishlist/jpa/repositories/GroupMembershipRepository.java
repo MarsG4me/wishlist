@@ -1,12 +1,15 @@
 package de.marsg.wishlist.jpa.repositories;
 
+import de.marsg.wishlist.jpa.entities.GroupEntity;
 import de.marsg.wishlist.jpa.entities.GroupMembershipEntity;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,9 +24,18 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
 
     List<GroupMembershipEntity> findByGroupsId(UUID groupsId);
 
+    List<GroupMembershipEntity> findByUsersId(UUID usersId);
+
+    /** Serializes last-admin checks and handovers on one group. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT g FROM GroupEntity g WHERE g.id = :id")
+    Optional<GroupEntity> findGroupForUpdate(@Param("id") UUID id);
+
     Page<GroupMembershipEntity> findByGroupsId(UUID groupsId, Pageable pageable);
 
     long countByGroupsIdAndIsAdminTrue(UUID groupsId);
+
+    long countByGroupsId(UUID groupsId);
 
     /** True when both users are members of at least one common (non-deleted) group. */
     @Query("""

@@ -2,31 +2,30 @@ package de.marsg.wishlist.endpoints.services;
 
 import de.marsg.wishlist.helpers.ApiException;
 import de.marsg.wishlist.helpers.ErrorCode;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
- * All Keycloak interactions of the backend. Keycloak stays the source of truth for
- * account data; our DB copies are only written after Keycloak accepted a change.
- *
- * Email: Account API with the user's own forwarded token.
- * Password: current password is verified via a direct-grant login, then the new
- * password is set through the Admin API using the backend's service account —
- * so the password UI can live inside the app without any redirect to Keycloak.
- * Locale: mirrored through the Admin API; our DB owns the value (see UserService).
+ * All Keycloak interactions of the backend; Keycloak is the source of truth for account data.
+ * Changes go through the Admin API (service account) and our DB copy is written afterwards.
  */
 @Component
 public class KeycloakAccountClient {
@@ -45,27 +44,23 @@ public class KeycloakAccountClient {
             @Value("${wishlist.keycloak.admin-client-id}") String adminClientId,
             @Value("${wishlist.keycloak.admin-client-secret}") String adminClientSecret,
             @Value("${wishlist.keycloak.verify-client-id}") String verifyClientId) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofSeconds(5));
+        this.restClient = RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
         this.realm = realm;
         this.adminClientId = adminClientId;
         this.adminClientSecret = adminClientSecret;
         this.verifyClientId = verifyClientId;
     }
 
-    /** Updates the account email (which is also the username). Throws on any Keycloak rejection. */
-    public void updateEmail(String bearerToken, String newEmail) {
-        try {
-            restClient.post()
-                    .uri("/realms/{realm}/account", realm)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("email", newEmail, "username", newEmail))
-                    .retrieve()
-                    .toBodilessEntity();
-        } catch (RestClientException e) {
-            log.warn("Keycloak rejected email update: {}", e.getMessage());
-            throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
-        }
+    /** Updates email and username via the Admin API and marks the email unverified. */
+    public void updateEmail(UUID keycloakId, String newEmail) {
+        rewriteUser(keycloakId, user -> {
+            user.put("email", newEmail);
+            user.put("username", newEmail);
+            user.put("emailVerified", false);
+        }, "email update");
     }
 
     /**
@@ -78,8 +73,20 @@ public class KeycloakAccountClient {
      * is read first and sent back with just the locale entry overwritten.
      */
     public void updateLocale(UUID keycloakId, String locale) {
-        String token = serviceAccountToken();
+        rewriteUser(keycloakId, user -> {
+            Map<String, Object> attributes = new HashMap<>();
+            if (user.get("attributes") instanceof Map<?, ?> existing) {
+                existing.forEach((key, value) -> attributes.put(String.valueOf(key), value));
+            }
+            attributes.put("locale", List.of(locale));
+            user.put("attributes", attributes);
+        }, "locale update");
+    }
+
+    /** Read-modify-write of the full user representation through the Admin API. */
+    private void rewriteUser(UUID keycloakId, Consumer<Map<String, Object>> change, String what) {
         try {
+            String token = serviceAccountToken();
             Map<?, ?> current = restClient.get()
                     .uri("/admin/realms/{realm}/users/{id}", realm, keycloakId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -90,12 +97,7 @@ public class KeycloakAccountClient {
             }
             Map<String, Object> user = new HashMap<>();
             current.forEach((key, value) -> user.put(String.valueOf(key), value));
-            Map<String, Object> attributes = new HashMap<>();
-            if (user.get("attributes") instanceof Map<?, ?> existing) {
-                existing.forEach((key, value) -> attributes.put(String.valueOf(key), value));
-            }
-            attributes.put("locale", List.of(locale));
-            user.put("attributes", attributes);
+            change.accept(user);
             restClient.put()
                     .uri("/admin/realms/{realm}/users/{id}", realm, keycloakId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -104,9 +106,101 @@ public class KeycloakAccountClient {
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException e) {
-            log.warn("Keycloak rejected locale update for {}: {}", keycloakId, e.getMessage());
+            log.warn("Keycloak rejected {} for {}: {}", what, keycloakId, statusOf(e));
             throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
         }
+    }
+
+    /** Whether Keycloak still knows the user; 404 is false, any other failure is KEYCLOAK_UNAVAILABLE. */
+    public boolean userExists(UUID keycloakId) {
+        String token = tokenOrUnavailable(keycloakId);
+        try {
+            fetchAdmin("/admin/realms/{realm}/users/{id}", keycloakId, token, Map.class);
+            return true;
+        } catch (HttpClientErrorException.NotFound e) {
+            if (isUserNotFound(e)) {
+                return false;
+            }
+            log.warn("Keycloak lookup of {} answered an unexpected 404", keycloakId);
+            throw new ApiException(ErrorCode.KEYCLOAK_UNAVAILABLE);
+        } catch (RestClientException e) {
+            log.warn("Keycloak lookup of {} failed: {}", keycloakId, statusOf(e));
+            throw new ApiException(ErrorCode.KEYCLOAK_UNAVAILABLE);
+        }
+    }
+
+    /** The Keycloak user representation; KEYCLOAK_UNAVAILABLE when it cannot be read. */
+    public Map<?, ?> fetchUser(UUID keycloakId) {
+        try {
+            return fetchAdmin("/admin/realms/{realm}/users/{id}", keycloakId, Map.class);
+        } catch (RestClientException e) {
+            log.warn("Keycloak user read of {} failed: {}", keycloakId, statusOf(e));
+            throw new ApiException(ErrorCode.KEYCLOAK_UNAVAILABLE);
+        }
+    }
+
+    /** Federated identities of the user; KEYCLOAK_UNAVAILABLE when they cannot be read. */
+    public List<?> fetchFederatedIdentities(UUID keycloakId) {
+        try {
+            return fetchAdmin("/admin/realms/{realm}/users/{id}/federated-identity", keycloakId, List.class);
+        } catch (RestClientException e) {
+            log.warn("Keycloak identity read of {} failed: {}", keycloakId, statusOf(e));
+            throw new ApiException(ErrorCode.KEYCLOAK_UNAVAILABLE);
+        }
+    }
+
+    /** Service token fetched outside any 404 handling; KEYCLOAK_UNAVAILABLE when it cannot be had. */
+    private String tokenOrUnavailable(UUID keycloakId) {
+        try {
+            return serviceAccountToken();
+        } catch (RestClientException e) {
+            log.warn("Keycloak token for {} failed: {}", keycloakId, statusOf(e));
+            throw new ApiException(ErrorCode.KEYCLOAK_UNAVAILABLE);
+        }
+    }
+
+    /** Keycloak's own "User not found" 404, as opposed to a 404 from a wrong path or proxy. */
+    private static boolean isUserNotFound(HttpClientErrorException.NotFound e) {
+        return e.getResponseBodyAsString().toLowerCase().contains("not found");
+    }
+
+    private <T> T fetchAdmin(String path, UUID keycloakId, Class<T> type) {
+        return fetchAdmin(path, keycloakId, tokenOrUnavailable(keycloakId), type);
+    }
+
+    private <T> T fetchAdmin(String path, UUID keycloakId, String token, Class<T> type) {
+        return restClient.get()
+                .uri(path, realm, keycloakId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .body(type);
+    }
+
+    /** Erases the account at Keycloak; an already missing user (404) counts as success. */
+    public void deleteUser(UUID keycloakId) {
+        String token = tokenOrUnavailable(keycloakId);
+        try {
+            restClient.delete()
+                    .uri("/admin/realms/{realm}/users/{id}", realm, keycloakId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException.NotFound e) {
+            if (!isUserNotFound(e)) {
+                log.warn("Keycloak deletion of {} answered an unexpected 404", keycloakId);
+                throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
+            }
+            log.info("Keycloak user {} was already gone", keycloakId);
+        } catch (RestClientException e) {
+            log.warn("Keycloak rejected deletion of {}: {}", keycloakId, statusOf(e));
+            throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
+        }
+    }
+
+    /** HTTP status only: exception messages can echo request or response content. */
+    private static String statusOf(RestClientException e) {
+        return e instanceof RestClientResponseException r ? String.valueOf(r.getStatusCode().value())
+                : "no response";
     }
 
     /**
@@ -119,7 +213,8 @@ public class KeycloakAccountClient {
         log.info("Password changed for keycloak user {}", keycloakId);
     }
 
-    private void verifyCurrentPassword(String email, String currentPassword) {
+    /** Direct-grant login with the given password; INVALID_CREDENTIALS when it does not authenticate. */
+    public void verifyCurrentPassword(String email, String currentPassword) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "password");
         form.add("client_id", verifyClientId);
@@ -135,7 +230,7 @@ public class KeycloakAccountClient {
         } catch (HttpClientErrorException e) {
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
         } catch (RestClientException e) {
-            log.warn("Password verification failed against Keycloak: {}", e.getMessage());
+            log.warn("Password verification failed against Keycloak: {}", statusOf(e));
             throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
         }
     }
@@ -150,7 +245,7 @@ public class KeycloakAccountClient {
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException e) {
-            log.warn("Keycloak rejected password reset: {}", e.getMessage());
+            log.warn("Keycloak rejected password reset: {}", statusOf(e));
             throw new ApiException(ErrorCode.KEYCLOAK_UPDATE_FAILED);
         }
     }

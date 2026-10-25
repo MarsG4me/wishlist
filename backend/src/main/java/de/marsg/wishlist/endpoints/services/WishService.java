@@ -48,16 +48,21 @@ public class WishService {
     private final WishlistService wishlistService;
     private final AccessService accessService;
     private final LimitService limitService;
+    private final LinkUrlValidator linkValidator;
+    private final LinkSafetyService linkSafety;
 
     public WishService(WishRepository wishRepository, ClaimRepository claimRepository,
             ClaimParticipantRepository participantRepository, WishlistService wishlistService,
-            AccessService accessService, LimitService limitService) {
+            AccessService accessService, LimitService limitService, LinkUrlValidator linkValidator,
+            LinkSafetyService linkSafety) {
         this.wishRepository = wishRepository;
         this.claimRepository = claimRepository;
         this.participantRepository = participantRepository;
         this.wishlistService = wishlistService;
         this.accessService = accessService;
         this.limitService = limitService;
+        this.linkValidator = linkValidator;
+        this.linkSafety = linkSafety;
     }
 
     /** Owner gets the claim-free view; group members get the shared view with claims. */
@@ -89,13 +94,27 @@ public class WishService {
                 claimsByWish(List.of(wishId), userId).getOrDefault(wishId, List.of()));
     }
 
+    /** Cheap read-only ownership check for create, run before any link safety call. */
+    @Transactional(readOnly = true)
+    public void assertMayCreate(UUID userId, UUID wishlistId) {
+        accessService.assertWishlistOwnerOrHide(userId, wishlistService.requireWishlist(wishlistId),
+                ErrorCode.WISHLIST_NOT_FOUND);
+    }
+
+    /** Cheap read-only ownership check for update, run before any link safety call. */
+    @Transactional(readOnly = true)
+    public void assertMayEdit(UUID userId, UUID wishId) {
+        accessService.assertWishlistOwnerOrHide(userId,
+                wishlistService.requireWishlist(requireWish(wishId).getWishlistsId()), ErrorCode.WISH_NOT_FOUND);
+    }
+
     @Transactional
-    public ReturnOwnWishDTO create(UUID userId, UserTier tier, CreateWishDTO dto) {
+    public ReturnOwnWishDTO create(UUID userId, UserTier tier, CreateWishDTO dto, List<WishLinkEntity> links) {
         WishlistEntity wishlist = wishlistService.requireWishlist(dto.wishlistId());
-        accessService.assertWishlistOwner(userId, wishlist);
+        accessService.assertWishlistOwnerOrHide(userId, wishlist, ErrorCode.WISHLIST_NOT_FOUND);
         limitService.assertCanAddWish(wishlist.getId(), tier);
         WishEntity wish = new WishEntity(wishlist.getId(), dto.name(), dto.description(), dto.quantity());
-        wish.replaceLinks(toLinkEntities(dto.links()));
+        wish.replaceLinks(links);
         wish = wishRepository.save(wish);
         log.info("User {} created wish {} in wishlist {}", userId, wish.getId(), wishlist.getId());
         return ReturnOwnWishDTO.from(wish);
@@ -103,15 +122,17 @@ public class WishService {
 
     /** Quantity reductions below the claim count are allowed; existing claims are grandfathered. */
     @Transactional
-    public ReturnUpdatedWishDTO update(UUID userId, UUID wishId, UpdateWishDTO dto) {
+    public ReturnUpdatedWishDTO update(UUID userId, UUID wishId, UpdateWishDTO dto,
+            List<WishLinkEntity> links) {
         WishEntity wish = requireWish(wishId);
-        accessService.assertWishlistOwner(userId, wishlistService.requireWishlist(wish.getWishlistsId()));
+        accessService.assertWishlistOwnerOrHide(userId,
+                wishlistService.requireWishlist(wish.getWishlistsId()), ErrorCode.WISH_NOT_FOUND);
         long claimCount = claimRepository.countByWishesId(wishId);
         boolean claimsAffected = dto.quantity() != null && claimCount > dto.quantity();
         wish.setName(dto.name());
         wish.setDescription(dto.description());
         wish.setQuantity(dto.quantity());
-        wish.replaceLinks(toLinkEntities(dto.links()));
+        wish.replaceLinks(links);
         return ReturnUpdatedWishDTO.from(wish, claimsAffected);
     }
 
@@ -119,7 +140,8 @@ public class WishService {
     @Transactional
     public void softDelete(UUID userId, UUID wishId, boolean confirm) {
         WishEntity wish = requireWish(wishId);
-        accessService.assertWishlistOwner(userId, wishlistService.requireWishlist(wish.getWishlistsId()));
+        accessService.assertWishlistOwnerOrHide(userId,
+                wishlistService.requireWishlist(wish.getWishlistsId()), ErrorCode.WISH_NOT_FOUND);
         if (!confirm && claimRepository.countByWishesId(wishId) > 0) {
             throw new ApiException(ErrorCode.WISH_HAS_CLAIMS);
         }
@@ -172,13 +194,16 @@ public class WishService {
         return result;
     }
 
-    private List<WishLinkEntity> toLinkEntities(List<WishLinkDTO> links) {
+    /** Normalizes and safety-checks links; runs before the transaction so no row lock waits on HTTP. */
+    public List<WishLinkEntity> prepareLinks(List<WishLinkDTO> links) {
         if (links == null) {
             return List.of();
         }
         List<WishLinkEntity> entities = new ArrayList<>(links.size());
         for (int i = 0; i < links.size(); i++) {
-            entities.add(new WishLinkEntity(links.get(i).url(), links.get(i).label(), (short) i));
+            String url = linkValidator.normalize(links.get(i).url());
+            linkSafety.assertSafe(url);
+            entities.add(new WishLinkEntity(url, links.get(i).label(), (short) i));
         }
         return entities;
     }
